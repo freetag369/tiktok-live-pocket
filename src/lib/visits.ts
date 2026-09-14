@@ -125,9 +125,85 @@ export class VisitCounter {
     return this.records.size;
   }
 
+  /** 全レコードの複製(バックアップ用)。 */
+  all(): VisitRecord[] {
+    return [...this.records.values()].map((r) => ({ ...r }));
+  }
+
+  /**
+   * バックアップの取り込み。
+   *  - replace: いまの履歴を捨てて置き換える
+   *  - merge:   userId ごとに visits の多い方を採用し、名前等は lastSeenMs の新しい方を採用
+   * 取り込んだ行はすべて保存待ち(dirty)になる。ラッチ中の判定は触らない。
+   */
+  import(records: VisitRecord[], mode: 'merge' | 'replace'): { added: number; updated: number } {
+    if (mode === 'replace') {
+      this.records.clear();
+      this.latched.clear();
+    }
+    let added = 0;
+    let updated = 0;
+    for (const raw of records) {
+      const r = sanitizeRecord(raw);
+      if (!r) continue;
+      const cur = this.records.get(r.userId);
+      if (!cur) {
+        this.records.set(r.userId, r);
+        this.dirty.add(r.userId);
+        added++;
+        continue;
+      }
+      const newer = r.lastSeenMs >= cur.lastSeenMs ? r : cur;
+      const merged: VisitRecord = {
+        userId: cur.userId,
+        visits: Math.max(cur.visits, r.visits),
+        lastRoomId: newer.lastRoomId,
+        uniqueId: newer.uniqueId ?? cur.uniqueId,
+        nickname: newer.nickname ?? cur.nickname,
+        avatarUrl: newer.avatarUrl ?? cur.avatarUrl,
+        firstSeenMs: Math.min(cur.firstSeenMs, r.firstSeenMs),
+        lastSeenMs: Math.max(cur.lastSeenMs, r.lastSeenMs),
+      };
+      if (!sameRecord(merged, cur)) {
+        this.records.set(cur.userId, merged);
+        this.dirty.add(cur.userId);
+        updated++;
+      }
+    }
+    return { added, updated };
+  }
+
   clear(): void {
     this.records.clear();
     this.latched.clear();
     this.dirty.clear();
   }
+}
+
+/** 外から来た行を検証して VisitRecord にする。壊れていれば null。 */
+export function sanitizeRecord(raw: unknown): VisitRecord | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const userId = typeof r.userId === 'string' ? r.userId : typeof r.userId === 'number' ? String(r.userId) : '';
+  if (!userId) return null;
+  const visits = Math.max(0, Math.floor(Number(r.visits) || 0));
+  const now = Date.now();
+  const firstSeenMs = Number(r.firstSeenMs) || now;
+  const lastSeenMs = Number(r.lastSeenMs) || firstSeenMs;
+  const out: VisitRecord = {
+    userId,
+    visits,
+    lastRoomId: typeof r.lastRoomId === 'string' ? r.lastRoomId : '',
+    firstSeenMs,
+    lastSeenMs,
+  };
+  if (typeof r.uniqueId === 'string' && r.uniqueId) out.uniqueId = r.uniqueId;
+  if (typeof r.nickname === 'string' && r.nickname) out.nickname = r.nickname;
+  if (typeof r.avatarUrl === 'string' && /^https?:\/\//.test(r.avatarUrl)) out.avatarUrl = r.avatarUrl;
+  return out;
+}
+
+const FIELDS = ['userId', 'visits', 'lastRoomId', 'uniqueId', 'nickname', 'avatarUrl', 'firstSeenMs', 'lastSeenMs'] as const;
+function sameRecord(a: VisitRecord, b: VisitRecord): boolean {
+  return FIELDS.every((k) => (a[k] ?? undefined) === (b[k] ?? undefined));
 }

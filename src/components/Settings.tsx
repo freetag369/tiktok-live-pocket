@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { DEFAULT_WS_URL, type FontSize, type Settings } from '../lib/settings';
 import { wakeLockSupported } from '../lib/wake-lock';
+import type { LiveSession } from '../lib/session';
+import { BackupSection } from './BackupSection';
 
 interface Props {
   value: Settings;
@@ -10,9 +12,11 @@ interface Props {
   onResetHistory: () => Promise<void>;
   knownViewers: number;
   connected: boolean;
+  session: LiveSession;
+  rowCount: number;
 }
 
-export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory, knownViewers, connected }: Props) {
+export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory, knownViewers, connected, session, rowCount }: Props) {
   const [showKey, setShowKey] = useState(false);
   const [advanced, setAdvanced] = useState(value.wsUrl !== DEFAULT_WS_URL);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -113,6 +117,8 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
             </button>
           )}
         </div>
+
+        <BackupSection session={session} settings={value} onSettings={onChange} knownViewers={knownViewers} rowCount={rowCount} />
 
         <div className="section">
           <h2>動作確認</h2>

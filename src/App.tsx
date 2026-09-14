@@ -127,6 +127,8 @@ export function App() {
           onResetHistory={() => session.resetHistory()}
           knownViewers={snap.knownViewers}
           connected={connected}
+          session={session}
+          rowCount={f.rows.length}
         />
       ) : null}
     </div>

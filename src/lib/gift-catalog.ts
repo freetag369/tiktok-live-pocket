@@ -47,4 +47,29 @@ export class GiftCatalog {
   get size(): number {
     return this.map.size;
   }
+
+  all(): GiftCatalogRecord[] {
+    return [...this.map.values()].map((r) => ({ ...r }));
+  }
+
+  /** バックアップから取り込む(新しい updatedMs の方を採用)。 */
+  import(records: GiftCatalogRecord[]): number {
+    let n = 0;
+    for (const raw of records) {
+      if (!raw || typeof raw !== 'object' || typeof raw.giftId !== 'string' || !raw.giftId) continue;
+      const r: GiftCatalogRecord = {
+        giftId: raw.giftId,
+        name: typeof raw.name === 'string' ? raw.name : '',
+        diamonds: Math.max(0, Number(raw.diamonds) || 0),
+        iconUrl: typeof raw.iconUrl === 'string' && /^https?:\/\//.test(raw.iconUrl) ? raw.iconUrl : '',
+        updatedMs: Number(raw.updatedMs) || 0,
+      };
+      const cur = this.map.get(r.giftId);
+      if (cur && cur.updatedMs >= r.updatedMs) continue;
+      this.map.set(r.giftId, r);
+      this.dirty.add(r.giftId);
+      n++;
+    }
+    return n;
+  }
 }

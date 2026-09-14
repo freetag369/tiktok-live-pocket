@@ -61,6 +61,18 @@ export async function clearVisits(): Promise<void> {
   }
 }
 
+export async function replaceVisits(records: VisitRecord[]): Promise<void> {
+  try {
+    const db = await getDb();
+    const tx = db.transaction('visits', 'readwrite');
+    await tx.store.clear();
+    for (const r of records) void tx.store.put(r);
+    await tx.done;
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function loadGiftCatalog(): Promise<GiftCatalogRecord[]> {
   try {
     const db = await getDb();

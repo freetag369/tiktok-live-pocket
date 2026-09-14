@@ -4,7 +4,8 @@ import { applyEvent, createFeedState, resetForNewRoom, type FeedState } from './
 import { GiftCatalog } from './gift-catalog';
 import { normalize } from './normalize';
 import { VisitCounter } from './visits';
-import { loadGiftCatalog, loadVisits, saveGiftCatalog, saveVisits, clearVisits } from './db';
+import { loadGiftCatalog, loadVisits, saveGiftCatalog, saveVisits, clearVisits, replaceVisits, type GiftCatalogRecord } from './db';
+import type { VisitRecord } from './visits';
 import { EulerSocket, type SocketState } from './euler-socket';
 import { buildEulerUrl } from './euler-url';
 import type { Settings } from './settings';
@@ -244,6 +245,38 @@ export class LiveSession {
     this.visits.clear();
     await clearVisits();
     this.notify();
+  }
+
+  // ── バックアップ ─────────────────────────────────────────────────
+
+  /** 保存待ちを書き切ってから、来店履歴とギフトカタログの全件を返す。 */
+  async exportData(): Promise<{ visits: VisitRecord[]; gifts: GiftCatalogRecord[] }> {
+    await this.persist();
+    return { visits: this.visits.all(), gifts: this.catalog.all() };
+  }
+
+  /** バックアップを取り込み、IndexedDB に反映する。 */
+  async importData(o: { visits: VisitRecord[]; gifts: GiftCatalogRecord[]; mode: 'merge' | 'replace' }): Promise<{ added: number; updated: number; gifts: number }> {
+    const r = this.visits.import(o.visits, o.mode);
+    const gifts = this.catalog.import(o.gifts);
+    if (o.mode === 'replace') {
+      this.visits.drainDirty();
+      await replaceVisits(this.visits.all());
+    } else {
+      await this.persist();
+    }
+    await this.persist();
+    this.notify();
+    return { ...r, gifts };
+  }
+
+  /** いま画面にある行(書き出し用)。 */
+  get rows() {
+    return this.feed.rows;
+  }
+
+  get roomInfo(): RoomState {
+    return this.room;
   }
 
   clearFeed(): void {
