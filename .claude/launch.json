@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pocket-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--host", "--port", "5173"],
+      "port": 5173,
+      "url": "http://localhost:5173"
+    }
+  ]
+}

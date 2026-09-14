@@ -1,0 +1,40 @@
+/* 既存 PC アプリ(tiktok-live-stats)の配色を踏襲。 */
+:root {
+  --bg: #0f1116;
+  --bg-1: #151821;
+  --bg-2: #1b1f2a;
+  --bg-3: #232836;
+  --line: #2a3040;
+  --line-soft: #212636;
+  --fg: #e8eaf0;
+  --fg-dim: #a3aabd;
+  --fg-faint: #6f7891;
+  --accent: #29d6c4;
+  --pink: #ff5c8a;
+  --gold: #ffc542;
+  --violet: #a980ff;
+  --blue: #5aa9ff;
+  --green: #4ad991;
+  --red: #ff6b6b;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Segoe UI', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
+  --fs: 15px;
+  --fs-sm: 12px;
+  --fs-xs: 11px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+html[data-fs='small'] {
+  --fs: 13px;
+  --fs-sm: 11px;
+  --fs-xs: 10px;
+}
+html[data-fs='large'] {
+  --fs: 18px;
+  --fs-sm: 14px;
+  --fs-xs: 12px;
+}

@@ -1,0 +1,86 @@
+# TikTok LIVE ポケット
+
+TikTok LIVE の **コメント・入室(初見 / 何回目)・ギフト(画像つき)** を、配信用スマホとは別の iPhone で見るためのアプリです。
+PC は不要で、iPhone 単体で [Euler Stream](https://www.eulerstream.com/) の Cloud WebSocket に直接つないで受信します。
+
+Safari で開いて「ホーム画面に追加」すると、全画面のアプリとして使えます(PWA)。
+
+- 公開 URL: **https://freetag369.github.io/tiktok-live-pocket/**
+- ライセンス: AGPL-3.0(PC 版 [tiktok-live-stats](https://github.com/freetag369/tiktok-live-stats) と同じ)
+
+## iPhone での初回設定
+
+1. Safari で上の URL を開く
+2. 右上の ⚙️ →「配信者名」に TikTok の @ の後ろ(例: `metafact8`)を入れる
+3. 「Euler Stream API キー」に、eulerstream.com の無料 Community アカウントで発行したキーを貼る(PC 版で使っているキーと同じで OK)
+4. ✕ で閉じて、下の **接続** を押す
+5. Safari の共有ボタン(□に↑)→「ホーム画面に追加」
+
+配信が始まっていないときは「配信待ち」になり、60 秒ごとに再確認します(最長 4 時間)。
+
+## 画面
+
+| 場所 | 内容 |
+|---|---|
+| ヘッダ | 接続状態(● 緑=受信中 / 黄=接続・待機中 / 赤=停止)、配信者名、同接 👀、この配信の累計 💎 |
+| タブ | すべて / コメント / 入室 / ギフト(ギフトタブは画像が大きい) |
+| 行 | アイコン + 名前 + **初見** または **N回目** バッジ。ギフトは画像 + 名前 + ×連打数 + 💎。しきい値(既定 100💎)以上は金枠で大きく |
+| 下 | 新着は下に積まれます。上にスクロールすると追従が止まり「↓ 新着 N 件」で戻れます |
+
+## 来店回数の数え方
+
+- その配信(roomId)で **初めて姿を見せた瞬間** に +1(入室メッセージは混雑時に間引かれるので、コメントやギフトでも数えます)
+- 初見かどうかは +1 する前の回数が 0 かで決め、その配信中は固定
+- 再接続・アプリ再起動で同じ配信を見ても二重に数えません
+- 履歴はこの iPhone のブラウザ(IndexedDB)にだけ保存されます。Safari のサイトデータを消すと失われます
+
+## 既知の制約
+
+- **バックグラウンドでは受信が止まります**(iOS が WebSocket を切るため)。前面に戻すと自動でつなぎ直します。「画面を暗くしない」を ON にしておくとスリープしません(iOS 16.4 以降)
+- Euler の WebSocket は 8 時間で切れます → 自動で再接続します
+- 無料枠は 1 日 2,500 リクエスト・Cloud WebSocket 25 本。接続 1 回 = 1 リクエストなので、配信待ちの 60 秒ポーリング(1 時間 60 回)でも PC 版と併用して収まります
+- API キーは iPhone のこのブラウザにだけ保存されます(サーバーには送りません。Euler への接続 URL に載るだけです)
+
+## 開発
+
+```bash
+npm install
+npm run dev          # http://localhost:5173/tiktok-live-pocket/ (同じ Wi-Fi の iPhone からは http://<PCのIP>:5173/tiktok-live-pocket/)
+npm test             # 正規化・フィード・来店カウンタ・接続状態機械の単体テスト
+npm run build        # dist/ に PWA 一式(manifest / sw.js / icons)
+```
+
+### 通信なしで動作確認
+
+- アプリ内: 設定 →「▶ デモ再生(通信なし)」
+- モックサーバー(Euler の封筒形式で fixture を再生):
+
+```bash
+npm run mock -- --loop
+```
+
+アプリの設定 →「詳細」→ 接続先 WebSocket を `ws://localhost:8787`(iPhone からは `ws://<PCのIP>:8787`)にして「接続」。配信者名に `offline` を入れると「配信待ち」(4404)の挙動を確認できます。
+`ws://` は `npm run dev` の http ページからだけ使えます(GitHub Pages の https からは混在コンテンツとして遮断されます)。
+
+### 構成
+
+```
+src/lib/
+  euler-url.ts      Euler Cloud WebSocket の URL 組み立て
+  euler-socket.ts   接続状態機械(切断コード → 次の行動、バックオフ、前面復帰で再接続)
+  normalize.ts      受信メッセージ → 正規化イベント(Euler v2 と PC 版 v3 の両方の項目名を読む)
+  visits.ts         来店カウンタ(初見ラッチ・roomId 単位で 1 回)
+  feed.ts           画面の行(連打の同一行更新・msgId 重複排除・上限 500 行)
+  gift-catalog.ts   giftId → 画像/名前/💎 のキャッシュ
+  session.ts        上記の配線 + IndexedDB への保存
+src/components/     Header / FeedList / FeedRow / Settings / Avatar / Badges
+scripts/
+  mock-ws.mjs       モック WebSocket サーバー
+  make-demo.mjs     デモ用 fixture 生成
+  make-icons.mjs    アイコン PNG 生成
+```
+
+### 公開
+
+`main` に push すると GitHub Actions(`.github/workflows/pages.yml`)がテスト → ビルド → GitHub Pages へ配置します。
+リポジトリ名を変える場合は `vite.config.ts` の `base` も合わせてください。
