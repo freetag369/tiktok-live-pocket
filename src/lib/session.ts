@@ -194,6 +194,8 @@ export class LiveSession {
     this.socket?.stop();
     this.socket = null;
     this.stopDemo();
+    // デモは毎回同じ msgId を使うため、前の行と連打・重複排除の状態をまとめて初期化する。
+    this.feed = createFeedState();
     const roomId = `demo-${Date.now()}`;
     // 見本として「常連」「2回目」「初見」が混ざるように種を入れる(保存はしない)。
     const t0 = Date.now() - 7 * 24 * 3600 * 1000;
