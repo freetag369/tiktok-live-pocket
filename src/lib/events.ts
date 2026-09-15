@@ -11,6 +11,8 @@ export interface Viewer {
   isModerator?: boolean;
   isSubscriber?: boolean;
   isFollower?: boolean;
+  /** ギフターレベル(Barrage の userGradeParam.currentGrade)。入室通知に載っているときだけ入る。 */
+  gifterLevel?: number;
 }
 
 interface Base {

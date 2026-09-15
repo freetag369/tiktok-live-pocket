@@ -39,6 +39,38 @@ describe('normalize (v2 = Euler Cloud WebSocket)', () => {
     expect(s).toMatchObject({ kind: 'join', action: 3 });
   });
 
+  it('barrage: レベル持ちの入室通知(msgType 9)は入室、レベルを viewer に付ける', () => {
+    const e = normalize(
+      'WebcastBarrageMessage',
+      { common: { msgId: '30', createTime: '1785240000' }, msgType: 9, userGradeParam: { currentGrade: 32, userId: v2User.userId, user: v2User }, content: { key: 'pm_mt_grade_user_entrance' } },
+      NOW
+    );
+    expect(e).toMatchObject({ kind: 'join', action: 1, msgId: '30', viewer: { userId: '7000000000000000001', nickname: 'はなこ', gifterLevel: 32 } });
+  });
+
+  it('barrage: msgType が enum 名の文字列でも入室', () => {
+    const e = normalize('WebcastBarrageMessage', { common: { msgId: '31' }, msgType: 'BARRAGE_TYPE_GRADE_USER_ENTRANCE_NOTIFICATION', userGradeParam: { currentGrade: 5, user: v2User } }, NOW);
+    expect(e).toMatchObject({ kind: 'join', action: 1, viewer: { gifterLevel: 5 } });
+  });
+
+  it('barrage: ファンクラブレベル入室(11)と本文中のユーザー片からも入室者を取る', () => {
+    const fans = normalize('WebcastBarrageMessage', { common: { msgId: '32' }, msgType: 11, fansLevelParam: { currentGrade: 3, user: v2User } }, NOW);
+    expect(fans).toMatchObject({ kind: 'join', viewer: { userId: '7000000000000000001' } });
+    expect((fans as { viewer: { gifterLevel?: number } }).viewer.gifterLevel).toBeUndefined();
+    const pieces = normalize(
+      'WebcastBarrageMessage',
+      { common: { msgId: '33' }, content: { key: 'ttlive_superfan_commentnotif_superfanjoined', piecesList: [{ type: 11, userValue: { user: v2User } }] } },
+      NOW
+    );
+    expect(pieces).toMatchObject({ kind: 'join', viewer: { userId: '7000000000000000001' } });
+  });
+
+  it('barrage: 入室でない帯(サブスク 4・ギャラリー 13)や user 無しは null', () => {
+    expect(normalize('WebcastBarrageMessage', { common: { msgId: '34' }, msgType: 4, user: v2User, content: { key: 'pm_mt_subscribe' } }, NOW)).toBeNull();
+    expect(normalize('WebcastBarrageMessage', { common: { msgId: '35' }, msgType: 13, user: v2User }, NOW)).toBeNull();
+    expect(normalize('WebcastBarrageMessage', { common: { msgId: '36' }, msgType: 9 }, NOW)).toBeNull();
+  });
+
   it('gift: giftDetails / giftImage / repeatEnd は数値', () => {
     const data = {
       common: { msgId: '14', createTime: '1785240001' },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { applyEvent, createFeedState, FEED_MAX_ROWS, type FeedState } from '../src/lib/feed';
+import { applyEvent, createFeedState, FEED_MAX_ROWS, JOIN_DEDUPE_MS, type FeedState } from '../src/lib/feed';
 import { normalize } from '../src/lib/normalize';
 import type { NormalizedEvent } from '../src/lib/events';
 
@@ -36,6 +36,26 @@ describe('feed reducer', () => {
     s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW, viewer: { userId: 'u1' }, action: 1 }, meta);
     s = applyEvent(s, { kind: 'join', msgId: 'j2', tsMs: NOW, viewer: { userId: 'u1' }, action: 3 }, meta);
     expect(s.rows.map((r) => r.k)).toEqual(['join']);
+    expect(s.joinCount).toBe(1);
+  });
+
+  it('同じ人の入室が 10 秒以内に重なったら 1 行(MemberMessage + Barrage の保険)', () => {
+    let s = createFeedState();
+    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW, viewer: { userId: 'u1', gifterLevel: 32 }, action: 1 }, meta);
+    s = applyEvent(s, { kind: 'join', msgId: 'j2', tsMs: NOW + 500, viewer: { userId: 'u1' }, action: 1 }, meta);
+    s = applyEvent(s, { kind: 'join', msgId: 'j3', tsMs: NOW + 700, viewer: { userId: 'u2' }, action: 1 }, meta);
+    expect(s.rows.map((r) => r.viewer.userId)).toEqual(['u1', 'u2']);
+    expect(s.joinCount).toBe(2);
+    s = applyEvent(s, { kind: 'join', msgId: 'j4', tsMs: NOW + JOIN_DEDUPE_MS + 1, viewer: { userId: 'u1' }, action: 1 }, meta);
+    expect(s.rows.map((r) => r.viewer.userId)).toEqual(['u1', 'u2', 'u1']);
+    expect(s.joinCount).toBe(3);
+  });
+
+  it('grade-entrance: Barrage の入室 + 同じ人の MemberMessage で入室 1 行、サブスク帯は出ない', () => {
+    let s = createFeedState();
+    for (const e of fixtureEvents('synth-grade-entrance.ndjson')) s = applyEvent(s, e, meta);
+    expect(s.rows.map((r) => r.k)).toEqual(['join', 'comment']);
+    expect(s.rows[0]).toMatchObject({ k: 'join', viewer: { userId: '9001', nickname: 'ビッグ', gifterLevel: 32 } });
     expect(s.joinCount).toBe(1);
   });
 

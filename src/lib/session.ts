@@ -282,7 +282,7 @@ export class LiveSession {
   }
 
   clearFeed(): void {
-    this.feed = { ...createFeedState(), seen: this.feed.seen, seenOrder: this.feed.seenOrder, streaks: this.feed.streaks, diamonds: this.feed.diamonds, giftCount: this.feed.giftCount, commentCount: this.feed.commentCount, joinCount: this.feed.joinCount };
+    this.feed = { ...createFeedState(), seen: this.feed.seen, seenOrder: this.feed.seenOrder, streaks: this.feed.streaks, lastJoin: this.feed.lastJoin, diamonds: this.feed.diamonds, giftCount: this.feed.giftCount, commentCount: this.feed.commentCount, joinCount: this.feed.joinCount };
     this.notify();
   }
 }

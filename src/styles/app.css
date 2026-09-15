@@ -407,6 +407,10 @@ img {
   background: rgba(41, 214, 196, 0.18);
   color: var(--accent);
 }
+.badge.grade {
+  background: rgba(255, 197, 66, 0.2);
+  color: var(--gold);
+}
 
 /* ── 設定画面 ──────────────────────────────────────────── */
 .sheet {

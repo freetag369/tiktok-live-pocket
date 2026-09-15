@@ -12,6 +12,10 @@ import { idStr, numOr, pickUrl, str, toMs } from './ids';
  *   コメント     v2 data.comment           v3 data.content
  *   ギフト詳細   v2 data.giftDetails.{giftName,giftType,giftImage}   v3 data.gift.{name,type,icon}
  *   repeatEnd    どちらも「数値」(0/1)。boolean 比較は常に偽になる罠。
+ *
+ * ギフターレベル(バッジ)持ちの入室は MemberMessage ではなく WebcastBarrageMessage(帯メッセージ)で届く。
+ *   種別   msgType 9 = GRADE_USER_ENTRANCE_NOTIFICATION / 11 = FANS_LEVEL_ENTRANCE / 15 = ENIGMA_ENTRANCE
+ *   入室者 userGradeParam.user(+ currentGrade = レベル)/ fansLevelParam.user / user(v3)
  */
 
 type Any = Record<string, any>;
@@ -46,6 +50,31 @@ function tsOf(data: Any, now: number): number {
   return toMs(data?.common?.createTime ?? data?.common?.clientSendTime, now);
 }
 
+/** Barrage の種別のうち「入室」を表すもの(BarrageMessageBarrageType)。 */
+const BARRAGE_ENTRANCE_TYPES = new Set([9, 11, 15]);
+
+function isEntranceBarrage(data: Any): boolean {
+  const t = data.msgType;
+  if (typeof t === 'number' || (typeof t === 'string' && /^\d+$/.test(t))) return BARRAGE_ENTRANCE_TYPES.has(Number(t));
+  if (typeof t === 'string' && t.toUpperCase().includes('ENTRANCE')) return true;
+  const keys = [data.content?.key, data.commonBarrageContent?.key, data.content?.displayType, data.commonBarrageContent?.displayType]
+    .filter((k): k is string => typeof k === 'string' && k.length > 0)
+    .map((k) => k.toLowerCase());
+  return keys.some((k) => k.includes('entrance') || k.includes('enter') || k.includes('superfanjoined'));
+}
+
+/** Barrage の入室者。パラメータ → user → 本文中のユーザー片の順に探す。 */
+function barrageUser(data: Any): Any | null {
+  const direct = data.userGradeParam?.user ?? data.fansLevelParam?.user ?? data.user;
+  if (direct) return direct;
+  for (const text of [data.content, data.commonBarrageContent]) {
+    const pieces = (text?.piecesList ?? text?.pieces) as Any[] | undefined;
+    if (!Array.isArray(pieces)) continue;
+    for (const p of pieces) if (p?.userValue?.user) return p.userValue.user;
+  }
+  return null;
+}
+
 /**
  * 1 メッセージ → 0 or 1 イベント。情報が無いものは null(呼び出し側は skip)。
  * `type` は Euler の封筒の type("WebcastChatMessage" 等)または既存 fixtures の type。
@@ -77,6 +106,17 @@ export function normalize(type: string, raw: unknown, now = Date.now()): Normali
       const action = numOr(data.action, 0);
       const tsMs = tsOf(data, now);
       return { kind: 'join', msgId: msgIdOf(data, 'join', v.userId, tsMs, String(action)), tsMs, viewer: v, action };
+    }
+
+    case 'WebcastBarrageMessage': {
+      // レベル持ち・ファンクラブ・スーパーファンの入室通知だけを入室として扱う。サブスクや EC の帯は捨てる。
+      if (!isEntranceBarrage(data)) return null;
+      const v = viewerOf(barrageUser(data));
+      if (!v) return null;
+      const level = numOr(data.userGradeParam?.currentGrade, 0);
+      if (level > 0) v.gifterLevel = level;
+      const tsMs = tsOf(data, now);
+      return { kind: 'join', msgId: msgIdOf(data, 'join', v.userId, tsMs, 'barrage'), tsMs, viewer: v, action: 1 };
     }
 
     case 'WebcastChatMessage': {

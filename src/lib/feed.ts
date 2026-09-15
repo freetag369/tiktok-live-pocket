@@ -52,6 +52,8 @@ export interface FeedState {
   seenOrder: string[];
   /** 連打の進行中行: streakKey → { rowId, counted } */
   streaks: Map<string, { rowId: string; counted: number }>;
+  /** 直近の入室時刻: userId → tsMs(MemberMessage と Barrage の両方が届いたときの二重表示防止)。 */
+  lastJoin: Map<string, number>;
   /** この配信の累計💎(tick ごとの差分で積むので、最後の repeatEnd が欠けても正しい)。 */
   diamonds: number;
   giftCount: number;
@@ -61,6 +63,9 @@ export interface FeedState {
 
 export const FEED_MAX_ROWS = 500;
 export const SEEN_MAX = 5000;
+/** 同じ人の入室がこの間隔以内に重なったら 1 行にまとめる。 */
+export const JOIN_DEDUPE_MS = 10_000;
+const LAST_JOIN_PRUNE_AT = 2000;
 
 export function createFeedState(): FeedState {
   return {
@@ -68,6 +73,7 @@ export function createFeedState(): FeedState {
     seen: new Set(),
     seenOrder: [],
     streaks: new Map(),
+    lastJoin: new Map(),
     diamonds: 0,
     giftCount: 0,
     commentCount: 0,
@@ -125,6 +131,15 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
       // 1 = JOINED。3 = SUBSCRIBED は入室ではない。
       if (e.action !== 1) return s;
       if (!remember(s, e.msgId)) return s;
+      // 同じ人の入室が MemberMessage と Barrage(レベル持ち入室通知)の両方で届いても 1 行にする。
+      const prev = s.lastJoin.get(e.viewer.userId);
+      if (prev != null && Math.abs(e.tsMs - prev) < JOIN_DEDUPE_MS) return s;
+      const lastJoin = new Map(s.lastJoin);
+      if (lastJoin.size > LAST_JOIN_PRUNE_AT) {
+        const cutoff = e.tsMs - JOIN_DEDUPE_MS;
+        for (const [id, ts] of lastJoin) if (ts < cutoff) lastJoin.delete(id);
+      }
+      lastJoin.set(e.viewer.userId, e.tsMs);
       const row: FeedRow = {
         k: 'join',
         id: e.msgId,
@@ -133,7 +148,7 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         visits: meta.visits,
         firstEver: meta.firstEver,
       };
-      return { ...s, rows: push(s, row), joinCount: s.joinCount + 1 };
+      return { ...s, rows: push(s, row), lastJoin, joinCount: s.joinCount + 1 };
     }
 
     case 'social': {
@@ -213,5 +228,5 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
 
 /** 配信が切り替わったとき(roomId が変わった)に呼ぶ。行は残し、集計と重複表だけ捨てる。 */
 export function resetForNewRoom(s: FeedState): FeedState {
-  return { ...s, seen: new Set(), seenOrder: [], streaks: new Map(), diamonds: 0, giftCount: 0, commentCount: 0, joinCount: 0 };
+  return { ...s, seen: new Set(), seenOrder: [], streaks: new Map(), lastJoin: new Map(), diamonds: 0, giftCount: 0, commentCount: 0, joinCount: 0 };
 }

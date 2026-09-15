@@ -2,7 +2,7 @@ import { memo } from 'react';
 import type { FeedRow as Row } from '../lib/feed';
 import { hhmm, num } from '../lib/format';
 import { Avatar, GiftIcon } from './Avatar';
-import { RoleBadges, VisitBadge } from './Badges';
+import { GradeBadge, RoleBadges, VisitBadge } from './Badges';
 
 export interface RowProps {
   row: Row;
@@ -40,6 +40,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
           <Avatar url={v.avatarUrl} name={name} enabled={showAvatars} />
           <div className="body">
             <div className="head">
+              <GradeBadge v={v} />
               <span className="who">{name}</span>
               <span>が入室</span>
               <VisitBadge visits={row.visits} firstEver={row.firstEver} />
@@ -74,6 +75,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
               <span className="who">{name}</span>
               {handle ? <span className="handle">{handle}</span> : null}
               <VisitBadge visits={row.visits} firstEver={row.firstEver} />
+              <GradeBadge v={v} />
               <span className="time">{hhmm(row.tsMs)}</span>
             </div>
             <div className="gift-line">

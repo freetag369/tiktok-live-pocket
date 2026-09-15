@@ -60,7 +60,13 @@ at(7900, 'WebcastChatMessage', { common: common(7900), user: user(users[5]), con
 at(8600, 'WebcastRoomUserSeqMessage', { common: common(8600), total: '58', totalUser: '150' });
 at(9200, 'WebcastGiftMessage', { common: common(9200), user: user(users[0]), giftId: '5897', repeatCount: 1, repeatEnd: 0, gift: gifts.swan });
 at(9800, 'WebcastChatMessage', { common: common(9800), user: user(users[3]), userIdentity: identity(users[3]), content: '白鳥ありがとうございます！！' });
-at(10500, 'WebcastMemberMessage', { common: common(10500), user: user(users[6]), action: 1 });
+// レベル持ち(バッジ付き)の入室は MemberMessage ではなく Barrage(帯)で届く
+at(10500, 'WebcastBarrageMessage', {
+  common: common(10500),
+  msgType: 9,
+  userGradeParam: { currentGrade: 32, userId: users[6].id, user: user(users[6]) },
+  content: { key: 'pm_mt_grade_user_entrance', defaultPattern: '{0:user} joined' },
+});
 at(11200, 'WebcastChatMessage', { common: common(11200), user: user(users[6]), content: 'おつかれさまです' });
 at(12000, 'WebcastGiftMessage', { common: common(12000), user: user(users[1]), giftId: '11046', repeatCount: 1, repeatEnd: 0, gift: gifts.galaxy });
 at(12700, 'WebcastChatMessage', { common: common(12700), user: user(users[0]), content: 'えっギャラクシー！？すごい' });
