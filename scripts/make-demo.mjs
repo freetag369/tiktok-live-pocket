@@ -54,6 +54,7 @@ for (const [i, n] of [1, 3, 5, 8].entries()) {
 }
 at(5600, 'WebcastMemberMessage', { common: common(5600), user: user(users[4]), action: 1 });
 at(6100, 'WebcastChatMessage', { common: common(6100), user: user(users[2]), content: 'バラ送ったよ〜🌹' });
+at(6400, 'WebcastSocialMessage', { common: { ...common(6400), displayText: { key: 'pm_main_follow_message_viewer_2' } }, user: user(users[4]) });
 at(6800, 'WebcastGiftMessage', { common: common(6800), user: user(users[4]), giftId: '5487', repeatCount: 1, repeatEnd: 0, groupId: 'grp-fh-1', gift: gifts.finger });
 at(7200, 'WebcastGiftMessage', { common: common(7200), user: user(users[4]), giftId: '5487', repeatCount: 2, repeatEnd: 1, groupId: 'grp-fh-1', gift: gifts.finger });
 at(7900, 'WebcastChatMessage', { common: common(7900), user: user(users[5]), content: 'この曲なんて曲ですか？' });
@@ -68,6 +69,7 @@ at(10500, 'WebcastBarrageMessage', {
   content: { key: 'pm_mt_grade_user_entrance', defaultPattern: '{0:user} joined' },
 });
 at(11200, 'WebcastChatMessage', { common: common(11200), user: user(users[6]), content: 'おつかれさまです' });
+at(11600, 'WebcastSocialMessage', { common: { ...common(11600), displayText: { key: 'pm_main_follow_message_viewer_2' } }, user: user(users[6]) });
 at(12000, 'WebcastGiftMessage', { common: common(12000), user: user(users[1]), giftId: '11046', repeatCount: 1, repeatEnd: 0, gift: gifts.galaxy });
 at(12700, 'WebcastChatMessage', { common: common(12700), user: user(users[0]), content: 'えっギャラクシー！？すごい' });
 at(13300, 'WebcastSocialMessage', { common: { ...common(13300), displayText: { key: 'pm_mt_guidance_share' } }, user: user(users[5]) });
