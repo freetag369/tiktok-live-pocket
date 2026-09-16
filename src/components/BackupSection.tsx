@@ -37,18 +37,20 @@ export function BackupSection({ session, settings, onSettings, knownViewers, row
   const exportBackup = () =>
     run(async () => {
       const data = await session.exportData();
-      const b = buildBackup({ settings, visits: data.visits, gifts: data.gifts, includeApiKey: includeKey, appVersion: __APP_VERSION__ });
+      const b = buildBackup({ settings, visits: data.visits, gifts: data.gifts, memos: data.memos, includeApiKey: includeKey, appVersion: __APP_VERSION__ });
       const r = await saveTextFile(`live-pocket-backup-${stamp()}.json`, JSON.stringify(b, null, 1), 'application/json');
-      return r === 'cancelled' ? '' : `${data.visits.length.toLocaleString('ja-JP')} 人分を書き出しました`;
+      return r === 'cancelled' ? '' : `${data.visits.length.toLocaleString('ja-JP')} 人分・メモ ${data.memos.length.toLocaleString('ja-JP')} 件を書き出しました`;
     });
 
   const importBackup = (file: File) =>
     run(async () => {
       const parsed = parseBackup(await readTextFile(file));
-      const r = await session.importData({ visits: parsed.visits, gifts: parsed.gifts, mode });
+      const r = await session.importData({ visits: parsed.visits, gifts: parsed.gifts, memos: parsed.memos, mode });
       if (parsed.settings) onSettings(applyBackupSettings(settings, parsed.settings));
       const when = parsed.exportedAt ? `(${parsed.exportedAt.slice(0, 10)} のバックアップ)` : '';
-      return mode === 'replace' ? `${parsed.visits.length.toLocaleString('ja-JP')} 人分で置き換えました${when}` : `追加 ${r.added} 人・更新 ${r.updated} 人${when}`;
+      return mode === 'replace'
+        ? `${parsed.visits.length.toLocaleString('ja-JP')} 人分・メモ ${parsed.memos.length.toLocaleString('ja-JP')} 件で置き換えました${when}`
+        : `追加 ${r.added} 人・更新 ${r.updated} 人・メモ ${r.memos} 件${when}`;
     });
 
   const exportLog = (fmt: 'csv' | 'json') =>
@@ -69,7 +71,7 @@ export function BackupSection({ session, settings, onSettings, knownViewers, row
       <div className="section">
         <h2>バックアップ</h2>
         <p className="note">
-          来店履歴({knownViewers.toLocaleString('ja-JP')} 人)・ギフト画像のキャッシュ・設定を 1 つの JSON ファイルにします。iPhone では共有シートから「ファイルに保存」や AirDrop を選べます。機種変更や Safari のデータ消去に備えて、ときどき書き出してください。
+          来店履歴({knownViewers.toLocaleString('ja-JP')} 人)・リスナーメモ・ギフト画像のキャッシュ・設定を 1 つの JSON ファイルにします。iPhone では共有シートから「ファイルに保存」や AirDrop を選べます。機種変更や Safari のデータ消去に備えて、ときどき書き出してください。
         </p>
         <div className="field">
           <label>
@@ -84,7 +86,7 @@ export function BackupSection({ session, settings, onSettings, knownViewers, row
         <div className="field">
           <label>
             読み込み方法
-            <small>統合: 回数の多い方を残す / 置き換え: 今の履歴を捨てる</small>
+            <small>統合: 回数の多い方・新しいメモを残す / 置き換え: 今の履歴とメモを捨てる</small>
           </label>
           <select value={mode} onChange={(e) => setMode(e.target.value as 'merge' | 'replace')}>
             <option value="merge">統合</option>

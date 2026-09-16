@@ -52,6 +52,45 @@ describe('demo session', () => {
     }
   });
 
+  it('setMemo は snapshot.memos に載り、resetHistory 後も残る', async () => {
+    session.setMemo('real-1', { note: '常連さん', kana: 'たろう', nickname: 'たろう' });
+    expect(session.snapshot().memos.get('real-1')).toMatchObject({ note: '常連さん', kana: 'たろう' });
+    expect(session.memoCount).toBe(1);
+    await session.resetHistory();
+    expect(session.snapshot().memos.get('real-1')?.note).toBe('常連さん');
+    // 両方空にすると消える
+    session.setMemo('real-1', { note: '', kana: '' });
+    expect(session.snapshot().memos.get('real-1')).toBeUndefined();
+    expect(session.memoCount).toBe(0);
+  });
+
+  it('デモ中のメモは使い捨てで、本物のメモとバックアップに残らない', async () => {
+    session.setMemo('real-1', { note: '本物', kana: '' });
+    session.playDemo(demo);
+    // 見本のメモが見え、本物は見えない
+    expect(session.snapshot().memos.get('4')?.note).toBeTruthy();
+    expect(session.snapshot().memos.get('real-1')).toBeUndefined();
+    session.setMemo('1', { note: 'デモで書いた', kana: '' });
+    expect(session.snapshot().memos.get('1')?.note).toBe('デモで書いた');
+    session.disconnect();
+    expect(session.snapshot().memos.get('1')).toBeUndefined();
+    expect(session.snapshot().memos.get('real-1')?.note).toBe('本物');
+    const data = await session.exportData();
+    expect(data.memos.map((m) => m.userId)).toEqual(['real-1']);
+  });
+
+  it('viewersForList は最近来た順で、メモを結合し、来店履歴の無いメモは末尾', () => {
+    session.ingest('roomInfo', { id_str: 'r1' });
+    session.ingest('WebcastChatMessage', { common: { msgId: 'c1' }, user: { id: 'a', nickname: 'A' }, content: 'x' }, 1000);
+    session.ingest('WebcastChatMessage', { common: { msgId: 'c2' }, user: { id: 'b', nickname: 'B' }, content: 'y' }, 2000);
+    session.setMemo('a', { note: 'メモA', kana: '' });
+    session.setMemo('ghost', { note: '来店履歴なし', kana: '', nickname: 'G' });
+    const list = session.viewersForList();
+    expect(list.map((x) => x.userId)).toEqual(['b', 'a', 'ghost']);
+    expect(list[1]!.memo?.note).toBe('メモA');
+    expect(list[2]).toMatchObject({ visits: 0, nickname: 'G' });
+  });
+
   it('連打途中で再デモしても古いタイマーと連打状態を引き継がない', () => {
     session.playDemo(demo);
     vi.advanceTimersByTime(4700);

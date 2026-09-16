@@ -4,8 +4,9 @@ import { applyEvent, createFeedState, resetForNewRoom, type FeedState } from './
 import { GiftCatalog } from './gift-catalog';
 import { normalize } from './normalize';
 import { VisitCounter } from './visits';
-import { loadGiftCatalog, loadVisits, saveGiftCatalog, saveVisits, clearVisits, replaceVisits, type GiftCatalogRecord } from './db';
+import { loadGiftCatalog, loadVisits, saveGiftCatalog, saveVisits, clearVisits, replaceVisits, loadMemos, saveMemos, replaceMemos, type GiftCatalogRecord } from './db';
 import type { VisitRecord } from './visits';
+import { MemoBook, type MemoPatch, type MemoRecord } from './memos';
 import { EulerSocket, type SocketState } from './euler-socket';
 import { buildEulerUrl } from './euler-url';
 import type { Settings } from './settings';
@@ -31,6 +32,19 @@ export interface SessionSnapshot {
   demo: boolean;
   /** 保存済み来店レコード数(設定画面の表示用)。 */
   knownViewers: number;
+  /** リスナーメモ(userId → メモ)。行の描画時に引く。中身が変わったときだけ参照が変わる。 */
+  memos: ReadonlyMap<string, MemoRecord>;
+}
+
+/** リスナー一覧の 1 行(来店履歴 + メモ)。 */
+export interface ViewerListItem {
+  userId: string;
+  nickname?: string;
+  uniqueId?: string;
+  avatarUrl?: string;
+  visits: number;
+  lastSeenMs: number;
+  memo?: MemoRecord;
 }
 
 type Listener = (s: SessionSnapshot) => void;
@@ -42,6 +56,9 @@ export class LiveSession {
   private visits = new VisitCounter();
   /** デモ再生中だけ使う使い捨てカウンタ(本物の来店履歴を汚さない)。 */
   private demoVisits: VisitCounter | null = null;
+  private memos = new MemoBook();
+  /** デモ再生中だけ使う使い捨てメモ帳(本物のメモを汚さない)。 */
+  private demoMemos: MemoBook | null = null;
   private catalog = new GiftCatalog();
   private socket: EulerSocket | null = null;
   private listeners = new Set<Listener>();
@@ -63,9 +80,10 @@ export class LiveSession {
   }
 
   private async load(): Promise<void> {
-    const [v, g] = await Promise.all([loadVisits(), loadGiftCatalog()]);
+    const [v, g, m] = await Promise.all([loadVisits(), loadGiftCatalog(), loadMemos()]);
     this.visits = new VisitCounter(v);
     this.catalog = new GiftCatalog(g);
+    this.memos = new MemoBook(m);
     this.notify();
   }
 
@@ -82,26 +100,34 @@ export class LiveSession {
   }
 
   snapshot(): SessionSnapshot {
-    return { feed: this.feed, socket: this.socketState, room: this.room, demo: this.demoStop != null, knownViewers: this.visits.size };
+    return { feed: this.feed, socket: this.socketState, room: this.room, demo: this.demoStop != null, knownViewers: this.visits.size, memos: (this.demoMemos ?? this.memos).view() };
   }
 
   private notify(): void {
     if (this.scheduled) return;
     this.scheduled = true;
+    let done = false;
     const run = () => {
+      if (done) return;
+      done = true;
       this.scheduled = false;
       const snap = this.snapshot();
       for (const l of this.listeners) l(snap);
     };
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
-    else setTimeout(run, 50);
+    // 画面が隠れていたり描画が止まっていると rAF は来ない(iOS の背面・低電力、PC のタブ非表示)。
+    // その間も状態は届けたいので、rAF と setTimeout の早い方で流す。
+    const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    if (typeof requestAnimationFrame === 'function' && !hidden) requestAnimationFrame(run);
+    setTimeout(run, hidden ? 50 : 100);
   }
 
   private async persist(): Promise<void> {
     const v = this.visits.drainDirty();
     const g = this.catalog.drainDirty();
+    const m = this.memos.drainDirty();
     if (v.length) await saveVisits(v);
     if (g.length) await saveGiftCatalog(g);
+    if (m.put.length || m.del.length) await saveMemos(m.put, m.del);
   }
 
   // ── 接続 ─────────────────────────────────────────────────────────────
@@ -205,6 +231,8 @@ export class LiveSession {
       { userId: '4', visits: 40, lastRoomId: 'demo-old', firstSeenMs: t0, lastSeenMs: t0 },
       { userId: '5', visits: 4, lastRoomId: 'demo-old', firstSeenMs: t0, lastSeenMs: t0 },
     ]);
+    // 見本のメモ(たろう = モデ)。デモ中に書いたメモもこの使い捨て帳に入り、本物には残らない。
+    this.demoMemos = new MemoBook([{ userId: '4', note: 'モデさん。ゲームの話が好き', kana: 'たろう', updatedMs: t0, nickname: 'たろう', uniqueId: 'taro.t' }]);
     this.socketState = { s: 'live', sinceMs: Date.now() };
     this.apply({ kind: 'roomInfo', msgId: `roomInfo:${roomId}`, tsMs: Date.now(), roomId, hostNickname: 'デモ配信', hostUniqueId: 'demo' }, Date.now());
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -235,6 +263,7 @@ export class LiveSession {
     }
     if (this.demoVisits) {
       this.demoVisits = null;
+      this.demoMemos = null;
       // デモの部屋を本物の来店カウンタに残さない。次の roomInfo で切り替わる。
       this.room = { roomId: '' };
       this.feed = resetForNewRoom(this.feed);
@@ -243,33 +272,71 @@ export class LiveSession {
 
   // ── 設定画面から ─────────────────────────────────────────────────
 
+  /** 来店回数を全消去する。リスナーメモは残す。 */
   async resetHistory(): Promise<void> {
     this.visits.clear();
     await clearVisits();
     this.notify();
   }
 
+  // ── リスナーメモ ─────────────────────────────────────────────────
+
+  /** メモを書く(両方空なら削除)。デモ中は使い捨て帳に書く。すぐ保存する。 */
+  setMemo(userId: string, patch: MemoPatch, now = Date.now()): MemoRecord | null {
+    const book = this.demoMemos ?? this.memos;
+    const r = book.set(userId, patch, now);
+    this.notify();
+    if (book === this.memos) void this.persist();
+    return r;
+  }
+
+  getMemo(userId: string): MemoRecord | undefined {
+    return (this.demoMemos ?? this.memos).get(userId);
+  }
+
+  get memoCount(): number {
+    return this.memos.size;
+  }
+
+  /** リスナー一覧(来店履歴 + メモ)。最近来た順。来店履歴の無いメモだけの人は末尾。 */
+  viewersForList(): ViewerListItem[] {
+    const out: ViewerListItem[] = [];
+    const seen = new Set<string>();
+    for (const v of this.visits.all()) {
+      seen.add(v.userId);
+      const memo = this.memos.get(v.userId);
+      out.push({ userId: v.userId, nickname: v.nickname, uniqueId: v.uniqueId, avatarUrl: v.avatarUrl, visits: v.visits, lastSeenMs: v.lastSeenMs, memo });
+    }
+    out.sort((a, b) => b.lastSeenMs - a.lastSeenMs);
+    for (const m of this.memos.all()) {
+      if (seen.has(m.userId)) continue;
+      out.push({ userId: m.userId, nickname: m.nickname, uniqueId: m.uniqueId, visits: 0, lastSeenMs: 0, memo: m });
+    }
+    return out;
+  }
+
   // ── バックアップ ─────────────────────────────────────────────────
 
-  /** 保存待ちを書き切ってから、来店履歴とギフトカタログの全件を返す。 */
-  async exportData(): Promise<{ visits: VisitRecord[]; gifts: GiftCatalogRecord[] }> {
+  /** 保存待ちを書き切ってから、来店履歴・ギフトカタログ・メモの全件を返す。 */
+  async exportData(): Promise<{ visits: VisitRecord[]; gifts: GiftCatalogRecord[]; memos: MemoRecord[] }> {
     await this.persist();
-    return { visits: this.visits.all(), gifts: this.catalog.all() };
+    return { visits: this.visits.all(), gifts: this.catalog.all(), memos: this.memos.all() };
   }
 
   /** バックアップを取り込み、IndexedDB に反映する。 */
-  async importData(o: { visits: VisitRecord[]; gifts: GiftCatalogRecord[]; mode: 'merge' | 'replace' }): Promise<{ added: number; updated: number; gifts: number }> {
+  async importData(o: { visits: VisitRecord[]; gifts: GiftCatalogRecord[]; memos?: MemoRecord[]; mode: 'merge' | 'replace' }): Promise<{ added: number; updated: number; gifts: number; memos: number }> {
     const r = this.visits.import(o.visits, o.mode);
     const gifts = this.catalog.import(o.gifts);
+    const memos = this.memos.import(o.memos ?? [], o.mode);
     if (o.mode === 'replace') {
       this.visits.drainDirty();
+      this.memos.drainDirty();
       await replaceVisits(this.visits.all());
-    } else {
-      await this.persist();
+      await replaceMemos(this.memos.all());
     }
     await this.persist();
     this.notify();
-    return { ...r, gifts };
+    return { ...r, gifts, memos };
   }
 
   /** いま画面にある行(書き出し用)。 */

@@ -249,6 +249,35 @@ img {
   border-left-color: var(--pink);
   background: rgba(255, 92, 138, 0.07);
 }
+/* タップでメモ。押した感触だけ返す(選択ハイライトは出さない)。 */
+.row.tappable {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.row.tappable:active {
+  background: var(--bg-2);
+}
+/* メモ持ちは左に金線。初見(ピンク)の方を優先する。 */
+.row.has-memo:not(.first):not(.gift) {
+  border-left-color: var(--gold);
+}
+.kana {
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+.memo-line {
+  color: var(--gold);
+  font-size: var(--fs-sm);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memo-line.faint {
+  color: var(--fg-faint);
+}
 .row.join {
   color: var(--fg-dim);
   font-size: var(--fs-sm);
@@ -590,4 +619,204 @@ img {
   padding: 3px 10px;
   font-size: var(--fs-xs);
   color: inherit;
+}
+
+/* ── メモ編集(ボトムシート) ─────────────────────────────── */
+.msheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.55);
+}
+.msheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 21;
+  max-height: 85dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  border-radius: 16px 16px 0 0;
+  padding: 12px 14px calc(var(--safe-bottom) + 12px);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+  animation: sheetup 0.18s ease-out;
+}
+@keyframes sheetup {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.msheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.msheet-who {
+  flex: 1;
+  min-width: 0;
+}
+.msheet-who .row-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.msheet-who .who {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msheet-who .handle {
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.msheet-sub {
+  margin-top: 3px;
+}
+.msheet-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 0 4px;
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+  font-weight: 600;
+}
+.msheet-label small {
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+.msheet-label .cnt {
+  margin-left: auto;
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.msheet textarea,
+.msheet input[type='text'] {
+  display: block;
+  width: 100%;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px; /* iOS: 16px 未満だと入力時に自動ズームする */
+  line-height: 1.4;
+  resize: none;
+}
+.msheet textarea:focus,
+.msheet input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.msheet-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.msheet-actions .btn {
+  flex: 1;
+  margin: 0;
+  padding: 11px;
+}
+
+/* ── リスナー一覧 ──────────────────────────────────────── */
+.sheet.viewers {
+  z-index: 11;
+}
+.viewers-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 0;
+}
+.viewers-tools input[type='search'] {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  color: var(--fg);
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.viewers-tools input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.viewers-toggle {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.viewers-count {
+  flex: none;
+  margin: 6px 14px 0;
+  font-size: var(--fs-xs);
+}
+.viewers-list {
+  padding-top: 6px;
+}
+.vrow {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  padding: 9px 4px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 3px solid transparent;
+  color: var(--fg);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.vrow:active {
+  background: var(--bg-2);
+}
+.vrow.has-memo {
+  border-left-color: var(--gold);
+}
+.vrow .body {
+  flex: 1;
+  min-width: 0;
+}
+.vrow .head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  line-height: 1.3;
+}
+.vrow .who {
+  font-weight: 700;
+}
+.vrow .handle {
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+}
+.vrow .time {
+  margin-left: auto;
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
 }

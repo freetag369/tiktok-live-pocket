@@ -2,10 +2,12 @@ import type { GiftCatalogRecord } from './db';
 import type { FeedRow } from './feed';
 import { sanitize, type Settings } from './settings';
 import { sanitizeRecord, type VisitRecord } from './visits';
+import { sanitizeMemo, type MemoRecord } from './memos';
 
 /**
- * バックアップ(来店履歴 + ギフトカタログ + 設定)と、配信ログ(画面の行)の書き出し。
+ * バックアップ(来店履歴 + ギフトカタログ + リスナーメモ + 設定)と、配信ログ(画面の行)の書き出し。
  * 形式はどちらも人が読める JSON / CSV。API キーは明示したときだけ含める。
+ * `memos` は後から足した項目(省略可)。version 1 のまま読み書きできる。
  */
 
 export const BACKUP_FORMAT = 'tiktok-live-pocket-backup';
@@ -19,9 +21,10 @@ export interface Backup {
   settings: Omit<Settings, 'eulerApiKey'> & { eulerApiKey?: string };
   visits: VisitRecord[];
   gifts: GiftCatalogRecord[];
+  memos?: MemoRecord[];
 }
 
-export function buildBackup(o: { settings: Settings; visits: VisitRecord[]; gifts: GiftCatalogRecord[]; includeApiKey: boolean; appVersion: string; now?: Date }): Backup {
+export function buildBackup(o: { settings: Settings; visits: VisitRecord[]; gifts: GiftCatalogRecord[]; memos?: MemoRecord[]; includeApiKey: boolean; appVersion: string; now?: Date }): Backup {
   const { eulerApiKey, ...rest } = o.settings;
   return {
     format: BACKUP_FORMAT,
@@ -31,6 +34,7 @@ export function buildBackup(o: { settings: Settings; visits: VisitRecord[]; gift
     settings: o.includeApiKey && eulerApiKey ? { ...rest, eulerApiKey } : rest,
     visits: o.visits,
     gifts: o.gifts,
+    memos: o.memos ?? [],
   };
 }
 
@@ -38,6 +42,7 @@ export interface ParsedBackup {
   settings: Partial<Settings> | null;
   visits: VisitRecord[];
   gifts: GiftCatalogRecord[];
+  memos: MemoRecord[];
   exportedAt: string;
 }
 
@@ -55,8 +60,9 @@ export function parseBackup(text: string): ParsedBackup {
   if (Number(b.version) > BACKUP_VERSION) throw new Error('新しいバージョンのバックアップです。アプリを更新してください');
   const visits = Array.isArray(b.visits) ? (b.visits.map(sanitizeRecord).filter(Boolean) as VisitRecord[]) : [];
   const gifts = Array.isArray(b.gifts) ? (b.gifts.filter((g) => g && typeof g === 'object' && typeof (g as GiftCatalogRecord).giftId === 'string') as GiftCatalogRecord[]) : [];
+  const memos = Array.isArray(b.memos) ? (b.memos.map(sanitizeMemo).filter(Boolean) as MemoRecord[]) : [];
   const settings = b.settings && typeof b.settings === 'object' ? (b.settings as Partial<Settings>) : null;
-  return { settings, visits, gifts, exportedAt: typeof b.exportedAt === 'string' ? b.exportedAt : '' };
+  return { settings, visits, gifts, memos, exportedAt: typeof b.exportedAt === 'string' ? b.exportedAt : '' };
 }
 
 /** バックアップの設定を、いまの設定に重ねる(キーは入っていれば上書き、無ければ現状維持)。 */
