@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { VisitRecord } from './visits';
+import type { MemoRecord } from './memos';
 
 export interface GiftCatalogRecord {
   giftId: string;
@@ -12,10 +13,12 @@ export interface GiftCatalogRecord {
 interface PocketDB extends DBSchema {
   visits: { key: string; value: VisitRecord };
   gifts: { key: string; value: GiftCatalogRecord };
+  memos: { key: string; value: MemoRecord };
 }
 
 const DB_NAME = 'tiktok-live-pocket';
-const DB_VERSION = 1;
+/** v2: memos(リスナーメモ)ストアを追加。 */
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<PocketDB>> | null = null;
 
@@ -25,6 +28,7 @@ export function getDb(): Promise<IDBPDatabase<PocketDB>> {
       upgrade(db) {
         if (!db.objectStoreNames.contains('visits')) db.createObjectStore('visits', { keyPath: 'userId' });
         if (!db.objectStoreNames.contains('gifts')) db.createObjectStore('gifts', { keyPath: 'giftId' });
+        if (!db.objectStoreNames.contains('memos')) db.createObjectStore('memos', { keyPath: 'userId' });
       },
     });
   }
@@ -87,6 +91,43 @@ export async function saveGiftCatalog(records: GiftCatalogRecord[]): Promise<voi
   try {
     const db = await getDb();
     const tx = db.transaction('gifts', 'readwrite');
+    for (const r of records) void tx.store.put(r);
+    await tx.done;
+  } catch {
+    /* ignore */
+  }
+}
+
+// ── リスナーメモ ─────────────────────────────────────────────────────
+
+export async function loadMemos(): Promise<MemoRecord[]> {
+  try {
+    const db = await getDb();
+    return await db.getAll('memos');
+  } catch {
+    return [];
+  }
+}
+
+/** 追加・更新(put)と削除(del)を 1 トランザクションで反映する。 */
+export async function saveMemos(put: MemoRecord[], del: string[]): Promise<void> {
+  if (put.length === 0 && del.length === 0) return;
+  try {
+    const db = await getDb();
+    const tx = db.transaction('memos', 'readwrite');
+    for (const id of del) void tx.store.delete(id);
+    for (const r of put) void tx.store.put(r);
+    await tx.done;
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function replaceMemos(records: MemoRecord[]): Promise<void> {
+  try {
+    const db = await getDb();
+    const tx = db.transaction('memos', 'readwrite');
+    await tx.store.clear();
     for (const r of records) void tx.store.put(r);
     await tx.done;
   } catch {

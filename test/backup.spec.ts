@@ -12,18 +12,29 @@ const visits: VisitRecord[] = [
   { userId: 'u2', visits: 1, lastRoomId: 'r1', nickname: 'B', firstSeenMs: T, lastSeenMs: T },
 ];
 const gifts = [{ giftId: '5655', name: 'Rose', diamonds: 1, iconUrl: 'https://p16.tiktokcdn.com/rose.png', updatedMs: T }];
+const memos = [{ userId: 'u1', note: '誕生日 3/4', kana: 'えー', updatedMs: T, nickname: 'A', uniqueId: 'a' }];
 
 describe('backup round trip', () => {
-  it('書き出し → 読み込みで来店履歴とギフトが戻る。API キーは既定で含めない', () => {
-    const b = buildBackup({ settings, visits, gifts, includeApiKey: false, appVersion: '0.1.0', now: new Date(T) });
+  it('書き出し → 読み込みで来店履歴・ギフト・メモが戻る。API キーは既定で含めない', () => {
+    const b = buildBackup({ settings, visits, gifts, memos, includeApiKey: false, appVersion: '0.1.0', now: new Date(T) });
     const text = JSON.stringify(b);
     expect(text).not.toContain('secret-key');
     const p = parseBackup(text);
     expect(p.visits).toEqual(visits);
     expect(p.gifts).toEqual(gifts);
+    expect(p.memos).toEqual(memos);
     expect(p.settings?.hostUniqueId).toBe('metafact8');
     expect(p.settings?.eulerApiKey).toBeUndefined();
     expect(p.exportedAt).toBe(new Date(T).toISOString());
+  });
+
+  it('memos の無い旧バックアップも読め、memos は空になる', () => {
+    const p = parseBackup(JSON.stringify({ format: 'tiktok-live-pocket-backup', version: 1, visits, gifts }));
+    expect(p.visits).toEqual(visits);
+    expect(p.memos).toEqual([]);
+    // 壊れたメモ行は捨てる
+    const q = parseBackup(JSON.stringify({ format: 'tiktok-live-pocket-backup', version: 1, memos: [{ userId: 'x', note: 'ok' }, { note: 'no id' }, 3] }));
+    expect(q.memos).toEqual([{ userId: 'x', note: 'ok', kana: '', updatedMs: 0 }]);
   });
 
   it('includeApiKey=true ならキーも入る', () => {

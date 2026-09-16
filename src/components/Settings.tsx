@@ -10,13 +10,15 @@ interface Props {
   onClose: () => void;
   onDemo: () => void;
   onResetHistory: () => Promise<void>;
+  onOpenViewers: () => void;
   knownViewers: number;
+  memoCount: number;
   connected: boolean;
   session: LiveSession;
   rowCount: number;
 }
 
-export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory, knownViewers, connected, session, rowCount }: Props) {
+export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory, onOpenViewers, knownViewers, memoCount, connected, session, rowCount }: Props) {
   const [showKey, setShowKey] = useState(false);
   const [advanced, setAdvanced] = useState(value.wsUrl !== DEFAULT_WS_URL);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -91,13 +93,17 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
         </div>
 
         <div className="section">
-          <h2>来店履歴</h2>
+          <h2>来店履歴とメモ</h2>
           <p className="note">
-            この iPhone に <b>{knownViewers.toLocaleString('ja-JP')}</b> 人分の来店回数を保存しています。ブラウザのデータを消すと失われます。
+            この iPhone に <b>{knownViewers.toLocaleString('ja-JP')}</b> 人分の来店回数と <b>{memoCount.toLocaleString('ja-JP')}</b> 件のリスナーメモを保存しています。ブラウザのデータを消すと失われます。
           </p>
+          <button className="btn" onClick={onOpenViewers}>
+            👥 リスナー一覧・メモ
+          </button>
+          <p className="note">来た人を最近来た順に並べます。タップしてメモ・よみがなを書くと、次の配信からその人の行に表示されます。配信中はフィードの行をタップしても書けます。</p>
           {confirmReset ? (
             <>
-              <p className="err">本当に消しますか? 全員が「初見」に戻ります。</p>
+              <p className="err">本当に消しますか? 全員が「初見」に戻ります(メモは残ります)。</p>
               <button
                 className="btn danger"
                 onClick={async () => {

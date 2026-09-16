@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Header } from './components/Header';
 import { FeedList, type Tab } from './components/FeedList';
 import { SettingsSheet } from './components/Settings';
+import { MemoSheet, type MemoTarget } from './components/MemoSheet';
+import { ViewersSheet } from './components/ViewersSheet';
+import type { FeedRow } from './lib/feed';
 import { LiveSession, type SessionSnapshot } from './lib/session';
 import { loadSettings, sanitize, saveSettings, type Settings } from './lib/settings';
 import { installWakeLockRefresh, setWakeLock } from './lib/wake-lock';
@@ -23,6 +26,8 @@ export function App() {
   const [snap, setSnap] = useState<SessionSnapshot>(() => session.snapshot());
   const [tab, setTab] = useState<Tab>('all');
   const [showSettings, setShowSettings] = useState(() => !settings.hostUniqueId || !settings.eulerApiKey);
+  const [showViewers, setShowViewers] = useState(false);
+  const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
 
   useEffect(() => session.subscribe(setSnap), [session]);
 
@@ -55,6 +60,15 @@ export function App() {
       session.connect();
     }
   };
+
+  // 行タップ → その人のメモを書く。FeedRowView は memo() 済みなので、参照が安定するよう useCallback。
+  const onTapRow = useCallback((row: FeedRow) => {
+    const v = row.viewer;
+    setMemoTarget({ userId: v.userId, nickname: v.nickname, uniqueId: v.uniqueId, avatarUrl: v.avatarUrl, visits: row.visits, firstEver: row.firstEver });
+  }, []);
+
+  // リスナー一覧はシートを開いている間だけ組み立てる(メモ・来店履歴が変わったら作り直す)。
+  const viewerItems = useMemo(() => (showViewers ? session.viewersForList() : []), [showViewers, session, snap.memos, snap.knownViewers]);
 
   const f = snap.feed;
   const tabs: Array<[Tab, string, number | null]> = [
@@ -91,6 +105,8 @@ export function App() {
         tab={tab}
         showAvatars={settings.showAvatars}
         bigGiftDiamonds={settings.bigGiftDiamonds}
+        memos={snap.memos}
+        onTapRow={onTapRow}
         empty={
           connected || snap.demo ? (
             <>
@@ -125,10 +141,30 @@ export function App() {
             setTab('all');
           }}
           onResetHistory={() => session.resetHistory()}
+          onOpenViewers={() => setShowViewers(true)}
           knownViewers={snap.knownViewers}
+          memoCount={session.memoCount}
           connected={connected}
           session={session}
           rowCount={f.rows.length}
+        />
+      ) : null}
+      {showViewers ? (
+        <ViewersSheet
+          items={viewerItems}
+          showAvatars={settings.showAvatars}
+          onPick={(it) => setMemoTarget({ userId: it.userId, nickname: it.nickname ?? it.memo?.nickname, uniqueId: it.uniqueId ?? it.memo?.uniqueId, avatarUrl: it.avatarUrl, visits: it.visits > 0 ? it.visits : undefined })}
+          onClose={() => setShowViewers(false)}
+        />
+      ) : null}
+      {memoTarget ? (
+        <MemoSheet
+          key={memoTarget.userId}
+          target={memoTarget}
+          current={snap.memos.get(memoTarget.userId)}
+          showAvatars={settings.showAvatars}
+          onSave={(patch) => session.setMemo(memoTarget.userId, patch)}
+          onClose={() => setMemoTarget(null)}
         />
       ) : null}
     </div>
