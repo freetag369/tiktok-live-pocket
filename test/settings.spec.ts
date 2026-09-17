@@ -30,4 +30,10 @@ describe('sanitize', () => {
     expect(sanitize({ ...DEFAULT_SETTINGS, archiveKeepStreams: NaN }).archiveKeepStreams).toBe(30);
     expect(sanitize({ ...DEFAULT_SETTINGS, archiveEnabled: undefined as never }).archiveEnabled).toBe(true);
   });
+
+  it('likePopup は既定 true、boolean 以外は true に戻す', () => {
+    expect(DEFAULT_SETTINGS.likePopup).toBe(true);
+    expect(sanitize({ ...DEFAULT_SETTINGS, likePopup: 'yes' as never }).likePopup).toBe(true);
+    expect(sanitize({ ...DEFAULT_SETTINGS, likePopup: false }).likePopup).toBe(false);
+  });
 });

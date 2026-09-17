@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { applyEvent, createFeedState, FEED_MAX_ROWS, JOIN_DEDUPE_MS, type FeedState } from '../src/lib/feed';
+import { applyEvent, createFeedState, FEED_MAX_ROWS, JOIN_DEDUPE_MS, resetForNewRoom, type FeedState } from '../src/lib/feed';
 import { normalize } from '../src/lib/normalize';
+import { LIKE_BURST_MS, rankLikes } from '../src/lib/likes';
 import type { NormalizedEvent } from '../src/lib/events';
 
 const NOW = 1_785_240_000_000;
@@ -125,5 +126,87 @@ describe('feed reducer', () => {
     s = applyEvent(s, { kind: 'social', msgId: 's1', tsMs: NOW, viewer: { userId: 'u1' }, sub: 'follow' }, meta);
     s = applyEvent(s, { kind: 'social', msgId: 's2', tsMs: NOW, viewer: { userId: 'u1' }, sub: 'other' }, meta);
     expect(s.rows.map((r) => r.k)).toEqual(['social']);
+  });
+});
+
+function like(id: string, userId: string, count: number, roomTotal?: number): NormalizedEvent {
+  return { kind: 'like', msgId: id, tsMs: NOW, viewer: { userId, nickname: `n${userId}` }, count, roomTotal };
+}
+
+describe('feed reducer: いいね', () => {
+  it('small-room: 人ごとにタップを合算し、行は増やさない', () => {
+    let s = createFeedState();
+    for (const e of fixtureEvents('synth-small-room.ndjson')) s = applyEvent(s, e, meta, undefined, NOW);
+    expect(s.likes.size).toBe(5);
+    expect(s.likeCount).toBe(43);
+    expect(s.likeRoomTotal).toBe(1100);
+    const rank = rankLikes(s.likes, 10);
+    expect(rank.map((e) => e.userId)).toEqual(['101', '100', '104', '103', '102']);
+    expect(rank.map((e) => e.taps)).toEqual([14, 11, 8, 6, 4]);
+    expect(s.rows.every((r) => r.k === 'comment' || r.k === 'join' || r.k === 'social')).toBe(true);
+    expect(s.commentCount).toBe(12);
+  });
+
+  it('連打: 3 秒以内は burst が伸び、空くと取り直す', () => {
+    let s = createFeedState();
+    s = applyEvent(s, like('a', 'u1', 3), meta, undefined, NOW);
+    expect(s.likes.get('u1')).toMatchObject({ taps: 3, burst: 3, lastMs: NOW });
+    s = applyEvent(s, like('b', 'u1', 4), meta, undefined, NOW + LIKE_BURST_MS - 1);
+    expect(s.likes.get('u1')).toMatchObject({ taps: 7, burst: 7 });
+    s = applyEvent(s, like('c', 'u1', 2), meta, undefined, NOW + LIKE_BURST_MS - 1 + LIKE_BURST_MS);
+    expect(s.likes.get('u1')).toMatchObject({ taps: 9, burst: 2 });
+    expect(s.likeCount).toBe(9);
+  });
+
+  it('同じ msgId の再送と count 0 は捨てる(再接続のバックログ)', () => {
+    let s = createFeedState();
+    s = applyEvent(s, like('a', 'u1', 5), meta);
+    const again = applyEvent(s, like('a', 'u1', 5), meta);
+    expect(again).toBe(s);
+    expect(applyEvent(s, like('z', 'u1', 0), meta)).toBe(s);
+    let r = createFeedState();
+    for (const e of fixtureEvents('synth-reconnect-replay.ndjson')) r = applyEvent(r, e, meta);
+    expect(r.likes.get('1')?.taps).toBe(15);
+    expect(r.likeCount).toBe(15);
+  });
+
+  it('部屋全体の累計は見た中の最大、無ければ据え置き', () => {
+    let s = createFeedState();
+    expect(s.likeRoomTotal).toBeUndefined();
+    s = applyEvent(s, like('a', 'u1', 1, 500), meta);
+    s = applyEvent(s, like('b', 'u1', 1, 400), meta);
+    expect(s.likeRoomTotal).toBe(500);
+    s = applyEvent(s, like('c', 'u1', 1), meta);
+    expect(s.likeRoomTotal).toBe(500);
+  });
+
+  it('来店情報を持ち、Map は同じ参照のままエントリだけ差し替わる', () => {
+    let s = createFeedState();
+    s = applyEvent(s, like('a', 'u1', 1), { visits: 7, firstEver: false });
+    const m = s.likes;
+    const first = m.get('u1')!;
+    expect(first).toMatchObject({ visits: 7, firstEver: false });
+    s = applyEvent(s, like('b', 'u1', 1), { visits: 7, firstEver: false });
+    expect(s.likes).toBe(m);
+    expect(s.likes.get('u1')).not.toBe(first);
+  });
+
+  it('いいねは行を作らないので lastTouched を引き継がない(アーカイブに再投入しない)', () => {
+    let s = applyEvent(createFeedState(), comment('c1', 'hi'), meta);
+    expect(s.lastTouched).not.toBeNull();
+    s = applyEvent(s, like('a', 'u1', 4), meta, undefined, NOW);
+    expect(s.likeCount).toBe(4);
+    expect(s.lastTouched).toBeNull();
+  });
+
+  it('配信が変わると集計だけ消え、行は残る', () => {
+    let s = createFeedState();
+    s = applyEvent(s, comment('c1', 'hi'), meta);
+    s = applyEvent(s, like('a', 'u1', 4, 50), meta);
+    const r = resetForNewRoom(s);
+    expect(r.rows).toHaveLength(1);
+    expect(r.likes.size).toBe(0);
+    expect(r.likeCount).toBe(0);
+    expect(r.likeRoomTotal).toBeUndefined();
   });
 });

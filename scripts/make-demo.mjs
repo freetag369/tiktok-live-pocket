@@ -40,26 +40,35 @@ const base = 1785240000;
 const common = (o) => ({ msgId: `demo${++seq}`, createTime: String(base + Math.floor(o / 1000)) });
 const lines = [{ o: -1, meta: { note: 'デモ再生用の見本' } }];
 const at = (o, type, data) => lines.push({ o, type, data });
+// いいね: count = この 1 通にまとまったタップ数、total = 部屋全体の累計(その人の累計ではない)
+const like = (o, u, count, total) => at(o, 'WebcastLikeMessage', { common: common(o), user: user(u), count, total: String(total) });
 
 at(0, 'WebcastRoomUserSeqMessage', { common: common(0), total: '42', totalUser: '120' });
 at(300, 'WebcastMemberMessage', { common: common(300), user: user(users[0]), action: 1 });
 at(900, 'WebcastChatMessage', { common: common(900), user: user(users[0]), content: 'こんばんは〜！今日も来ました' });
+like(1200, users[0], 3, 120);
+like(1900, users[0], 5, 125);
 at(1600, 'WebcastMemberMessage', { common: common(1600), user: user(users[1]), action: 1 });
 at(2200, 'WebcastChatMessage', { common: common(2200), user: user(users[3]), userIdentity: identity(users[3]), content: '初見さんいらっしゃい👋' });
 at(2800, 'WebcastSocialMessage', { common: { ...common(2800), displayText: { key: 'pm_main_follow_message_viewer_2' } }, user: user(users[1]) });
 at(3300, 'WebcastChatMessage', { common: common(3300), user: user(users[1]), content: 'はじめまして！声きれい' });
+like(3600, users[2], 2, 127);
 // バラ 8 連打
 for (const [i, n] of [1, 3, 5, 8].entries()) {
   at(4000 + i * 350, 'WebcastGiftMessage', { common: common(4000 + i * 350), user: user(users[2]), giftId: '5655', repeatCount: n, repeatEnd: i === 3 ? 1 : 0, groupId: 'grp-rose-1', gift: gifts.rose });
 }
 at(5600, 'WebcastMemberMessage', { common: common(5600), user: user(users[4]), action: 1 });
+like(5900, users[4], 4, 131);
+like(6300, users[4], 6, 137);
 at(6100, 'WebcastChatMessage', { common: common(6100), user: user(users[2]), content: 'バラ送ったよ〜🌹' });
 at(6400, 'WebcastSocialMessage', { common: { ...common(6400), displayText: { key: 'pm_main_follow_message_viewer_2' } }, user: user(users[4]) });
 at(6800, 'WebcastGiftMessage', { common: common(6800), user: user(users[4]), giftId: '5487', repeatCount: 1, repeatEnd: 0, groupId: 'grp-fh-1', gift: gifts.finger });
 at(7200, 'WebcastGiftMessage', { common: common(7200), user: user(users[4]), giftId: '5487', repeatCount: 2, repeatEnd: 1, groupId: 'grp-fh-1', gift: gifts.finger });
 at(7900, 'WebcastChatMessage', { common: common(7900), user: user(users[5]), content: 'この曲なんて曲ですか？' });
+like(8200, users[0], 7, 144);
 at(8600, 'WebcastRoomUserSeqMessage', { common: common(8600), total: '58', totalUser: '150' });
 at(9200, 'WebcastGiftMessage', { common: common(9200), user: user(users[0]), giftId: '5897', repeatCount: 1, repeatEnd: 0, gift: gifts.swan });
+like(9500, users[5], 1, 145);
 at(9800, 'WebcastChatMessage', { common: common(9800), user: user(users[3]), userIdentity: identity(users[3]), content: '白鳥ありがとうございます！！' });
 // レベル持ち(バッジ付き)の入室は MemberMessage ではなく Barrage(帯)で届く
 at(10500, 'WebcastBarrageMessage', {
@@ -69,8 +78,10 @@ at(10500, 'WebcastBarrageMessage', {
   content: { key: 'pm_mt_grade_user_entrance', defaultPattern: '{0:user} joined' },
 });
 at(11200, 'WebcastChatMessage', { common: common(11200), user: user(users[6]), content: 'おつかれさまです' });
+like(11400, users[6], 9, 154);
 at(11600, 'WebcastSocialMessage', { common: { ...common(11600), displayText: { key: 'pm_main_follow_message_viewer_2' } }, user: user(users[6]) });
 at(12000, 'WebcastGiftMessage', { common: common(12000), user: user(users[1]), giftId: '11046', repeatCount: 1, repeatEnd: 0, gift: gifts.galaxy });
+like(12300, users[1], 3, 157);
 at(12700, 'WebcastChatMessage', { common: common(12700), user: user(users[0]), content: 'えっギャラクシー！？すごい' });
 at(13300, 'WebcastSocialMessage', { common: { ...common(13300), displayText: { key: 'pm_mt_guidance_share' } }, user: user(users[5]) });
 at(14000, 'WebcastChatMessage', { common: common(14000), user: user(users[4]), content: 'また来ます〜👋' });

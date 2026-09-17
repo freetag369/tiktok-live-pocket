@@ -254,7 +254,7 @@ export class LiveSession {
     if (!v) return;
     const meta = (this.demoVisits ?? this.visits).touch(v, now);
     if (e.kind === 'gift') this.catalog.observe(e, now);
-    const next = applyEvent(this.feed, e, meta, e.kind === 'gift' ? this.catalog.iconOf(e.giftId) : undefined);
+    const next = applyEvent(this.feed, e, meta, e.kind === 'gift' ? this.catalog.iconOf(e.giftId) : undefined, now);
     if (next !== this.feed) {
       // デモは本物のアーカイブに残さない。roomInfo 前の行(部屋が不明)も残さない。
       if (next.lastTouched && this.room.roomId && !this.demoVisits && this.getSettings().archiveEnabled) {
@@ -455,7 +455,7 @@ export class LiveSession {
   }
 
   clearFeed(): void {
-    this.feed = { ...createFeedState(), seen: this.feed.seen, seenOrder: this.feed.seenOrder, streaks: this.feed.streaks, lastJoin: this.feed.lastJoin, diamonds: this.feed.diamonds, giftCount: this.feed.giftCount, commentCount: this.feed.commentCount, joinCount: this.feed.joinCount };
+    this.feed = { ...createFeedState(), seen: this.feed.seen, seenOrder: this.feed.seenOrder, streaks: this.feed.streaks, lastJoin: this.feed.lastJoin, diamonds: this.feed.diamonds, giftCount: this.feed.giftCount, commentCount: this.feed.commentCount, joinCount: this.feed.joinCount, likes: this.feed.likes, likeCount: this.feed.likeCount, likeRoomTotal: this.feed.likeRoomTotal };
     this.notify();
   }
 }

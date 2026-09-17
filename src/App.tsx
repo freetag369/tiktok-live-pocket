@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Header } from './components/Header';
-import { FeedList, type Tab } from './components/FeedList';
+import { FeedList, type ScreenTab } from './components/FeedList';
+import { LikeRanking } from './components/LikeRanking';
+import { LikeToasts } from './components/LikeToasts';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
@@ -8,6 +10,7 @@ import type { FeedRow } from './lib/feed';
 import { FollowToast } from './components/FollowToast';
 import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
 import { ArchiveSheet } from './components/Archive';
+import { compact } from './lib/format';
 import { LiveSession, type SessionSnapshot } from './lib/session';
 import { loadSettings, sanitize, saveSettings, type Settings } from './lib/settings';
 import { installWakeLockRefresh, setWakeLock } from './lib/wake-lock';
@@ -27,7 +30,7 @@ export function App() {
   const session = useMemo(() => new LiveSession(() => settingsRef.current), []);
 
   const [snap, setSnap] = useState<SessionSnapshot>(() => session.snapshot());
-  const [tab, setTab] = useState<Tab>('all');
+  const [tab, setTab] = useState<ScreenTab>('all');
   const [showSettings, setShowSettings] = useState(() => !settings.hostUniqueId || !settings.eulerApiKey);
   const [showViewers, setShowViewers] = useState(false);
   const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
@@ -89,12 +92,29 @@ export function App() {
   const viewerItems = useMemo(() => (showViewers ? session.viewersForList() : []), [showViewers, session, snap.memos, snap.knownViewers]);
 
   const f = snap.feed;
-  const tabs: Array<[Tab, string, number | null]> = [
+  const tabs: Array<[ScreenTab, string, number | null]> = [
     ['all', 'すべて', null],
     ['comment', 'コメント', f.commentCount],
     ['join', '入室', f.joinCount],
     ['gift', 'ギフト', f.giftCount],
+    ['like', 'いいね', f.likeCount],
   ];
+  const emptyText =
+    connected || snap.demo ? (
+      <>
+        まだ何も届いていません。
+        <br />
+        配信が始まると、ここにコメント・入室・ギフトが流れます。
+      </>
+    ) : canConnect ? (
+      <>
+        下の <b>接続</b> を押すと受信を始めます。
+      </>
+    ) : (
+      <>
+        右上の ⚙️ から <b>配信者名</b> と <b>API キー</b> を設定してください。
+      </>
+    );
 
   return (
     <div className="app">
@@ -115,35 +135,32 @@ export function App() {
         {tabs.map(([k, label, n]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
             {label}
-            {n != null && n > 0 ? <span className="n">{n}</span> : null}
+            {n != null && n > 0 ? <span className="n">{compact(n)}</span> : null}
           </button>
         ))}
       </nav>
-      <FeedList
-        rows={f.rows}
-        tab={tab}
-        showAvatars={settings.showAvatars}
-        bigGiftDiamonds={settings.bigGiftDiamonds}
-        memos={snap.memos}
-        onTapRow={onTapRow}
-        empty={
-          connected || snap.demo ? (
-            <>
-              まだ何も届いていません。
-              <br />
-              配信が始まると、ここにコメント・入室・ギフトが流れます。
-            </>
-          ) : canConnect ? (
-            <>
-              下の <b>接続</b> を押すと受信を始めます。
-            </>
-          ) : (
-            <>
-              右上の ⚙️ から <b>配信者名</b> と <b>API キー</b> を設定してください。
-            </>
-          )
-        }
-      />
+      {tab === 'like' ? (
+        <LikeRanking
+          likes={f.likes}
+          likeCount={f.likeCount}
+          likeRoomTotal={f.likeRoomTotal}
+          showAvatars={settings.showAvatars}
+          empty={connected || snap.demo ? <>まだいいねが届いていません。</> : emptyText}
+        />
+      ) : (
+        <div className="feed-wrap">
+          <FeedList
+            rows={f.rows}
+            tab={tab}
+            showAvatars={settings.showAvatars}
+            bigGiftDiamonds={settings.bigGiftDiamonds}
+            memos={snap.memos}
+            onTapRow={onTapRow}
+            empty={emptyText}
+          />
+          {settings.likePopup ? <LikeToasts likes={f.likes} likeCount={f.likeCount} showAvatars={settings.showAvatars} /> : null}
+        </div>
+      )}
       <div style={{ flex: 'none', padding: '8px 12px calc(var(--safe-bottom) + 8px)', background: 'var(--bg-1)', borderTop: '1px solid var(--line)' }}>
         <button className={`btn ${connected ? '' : 'primary'}`} style={{ margin: 0 }} disabled={!connected && !canConnect} onClick={toggleConnect}>
           {connected ? '切断' : snap.demo ? 'デモを止めて接続' : '接続'}

@@ -83,6 +83,9 @@ describe('backup round trip', () => {
     expect(next.eulerApiKey).toBe('secret-key');
     expect(applyBackupSettings(settings, null)).toEqual(settings);
     expect(applyBackupSettings(settings, { followPopup: false }).followPopup).toBe(false);
+    expect(applyBackupSettings(settings, { likePopup: false }).likePopup).toBe(false);
+    expect(applyBackupSettings(settings, {}).likePopup).toBe(true);
+    expect(buildBackup({ settings, visits: [], gifts: [], includeApiKey: false, appVersion: '0.1.0' }).settings.likePopup).toBe(true);
   });
 });
 
