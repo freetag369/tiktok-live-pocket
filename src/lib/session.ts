@@ -1,4 +1,4 @@
-import type { NormalizedEvent } from './events';
+import type { NormalizedEvent, Viewer } from './events';
 import { viewerOf } from './events';
 import { applyEvent, createFeedState, resetForNewRoom, type FeedState } from './feed';
 import { GiftCatalog } from './gift-catalog';
@@ -49,6 +49,18 @@ export interface ViewerListItem {
 
 type Listener = (s: SessionSnapshot) => void;
 
+/** フォローが 1 件届いた(重複排除・鮮度チェック済み)。ポップアップ用。 */
+export interface FollowNotice {
+  viewer: Viewer;
+  visits: number;
+  firstEver: boolean;
+  tsMs: number;
+}
+type FollowListener = (n: FollowNotice) => void;
+
+/** これより古いフォローは通知しない(接続直後のバックログ再送対策)。 */
+export const FOLLOW_NOTICE_MAX_AGE_MS = 60_000;
+
 export class LiveSession {
   private feed: FeedState = createFeedState();
   private socketState: SocketState = { s: 'idle' };
@@ -62,6 +74,7 @@ export class LiveSession {
   private catalog = new GiftCatalog();
   private socket: EulerSocket | null = null;
   private listeners = new Set<Listener>();
+  private followListeners = new Set<FollowListener>();
   private scheduled = false;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private demoStop: (() => void) | null = null;
@@ -96,6 +109,14 @@ export class LiveSession {
     fn(this.snapshot());
     return () => {
       this.listeners.delete(fn);
+    };
+  }
+
+  /** フォロー到着を購読する。戻り値で解除。 */
+  onFollow(fn: FollowListener): () => void {
+    this.followListeners.add(fn);
+    return () => {
+      this.followListeners.delete(fn);
     };
   }
 
@@ -210,6 +231,11 @@ export class LiveSession {
     if (next !== this.feed) {
       this.feed = next;
       this.notify();
+      // デモは fixture の createTime が固定値なので鮮度は見ない。
+      if (e.kind === 'social' && e.sub === 'follow' && (this.demoStop != null || now - e.tsMs <= FOLLOW_NOTICE_MAX_AGE_MS)) {
+        const n: FollowNotice = { viewer: v, visits: meta.visits, firstEver: meta.firstEver, tsMs: e.tsMs };
+        for (const l of this.followListeners) l(n);
+      }
     }
   }
 

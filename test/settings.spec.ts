@@ -17,4 +17,9 @@ describe('sanitize', () => {
     expect(s.bigGiftDiamonds).toBe(100);
     expect(s.wsUrl).toBe(DEFAULT_SETTINGS.wsUrl);
   });
+
+  it('followPopup は未設定(古い保存データ)なら ON、false は保つ', () => {
+    expect(sanitize({ ...DEFAULT_SETTINGS, followPopup: undefined as never }).followPopup).toBe(true);
+    expect(sanitize({ ...DEFAULT_SETTINGS, followPopup: false }).followPopup).toBe(false);
+  });
 });

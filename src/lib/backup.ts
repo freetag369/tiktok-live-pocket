@@ -69,7 +69,7 @@ export function parseBackup(text: string): ParsedBackup {
 export function applyBackupSettings(current: Settings, incoming: Partial<Settings> | null): Settings {
   if (!incoming) return current;
   const next: Record<string, unknown> = { ...current };
-  for (const k of ['hostUniqueId', 'eulerApiKey', 'showAvatars', 'fontSize', 'bigGiftDiamonds', 'wakeLock', 'wsUrl'] as const) {
+  for (const k of ['hostUniqueId', 'eulerApiKey', 'showAvatars', 'fontSize', 'bigGiftDiamonds', 'wakeLock', 'followPopup', 'wsUrl'] as const) {
     const v = incoming[k];
     if (v === undefined || v === null) continue;
     next[k] = v;
