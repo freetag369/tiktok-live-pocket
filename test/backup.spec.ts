@@ -37,6 +37,25 @@ describe('backup round trip', () => {
     expect(q.memos).toEqual([{ userId: 'x', note: 'ok', kana: '', updatedMs: 0 }]);
   });
 
+  it('アーカイブは含めたときだけ入り、読み込みで戻る。壊れた行は捨てる', () => {
+    const plain = buildBackup({ settings, visits, gifts, includeApiKey: false, appVersion: '0.1.0' });
+    expect(plain).not.toHaveProperty('archive');
+    expect(parseBackup(JSON.stringify(plain)).archive).toBeNull();
+
+    const archive = {
+      streams: [{ roomId: 'r1', hostUniqueId: 'metafact8', startedMs: T, endedMs: T + 1000, rows: 2, comments: 1, joins: 0, gifts: 1, diamonds: 8 }],
+      rows: [
+        { k: 'comment' as const, id: 'c1', roomId: 'r1', tsMs: T, viewer: { userId: 'u1', nickname: 'A' }, text: 'hi', visits: 1, firstEver: true },
+        { k: 'gift' as const, id: 'g1', roomId: 'r1', tsMs: T + 1000, viewer: { userId: 'u2' }, giftId: '5655', giftName: 'Rose', count: 8, diamondEach: 1, diamonds: 8, streaking: false, visits: 1, firstEver: true },
+      ],
+    };
+    const b = buildBackup({ settings, visits, gifts, includeApiKey: false, appVersion: '0.1.0', archive });
+    const text = JSON.stringify(b).replace('"rows":[', '"rows":[{"k":"comment","id":"broken"},');
+    const p = parseBackup(text);
+    expect(p.archive?.streams).toEqual(archive.streams);
+    expect(p.archive?.rows).toEqual(archive.rows);
+  });
+
   it('includeApiKey=true ならキーも入る', () => {
     const b = buildBackup({ settings, visits: [], gifts: [], includeApiKey: true, appVersion: '0.1.0' });
     expect(b.settings.eulerApiKey).toBe('secret-key');
@@ -56,9 +75,11 @@ describe('backup round trip', () => {
   });
 
   it('設定の適用: 入っている項目だけ上書き、キーが無ければ現状維持', () => {
-    const next = applyBackupSettings(settings, { hostUniqueId: '@newhost', fontSize: 'large' });
+    const next = applyBackupSettings(settings, { hostUniqueId: '@newhost', fontSize: 'large', archiveEnabled: false, archiveKeepStreams: 7 });
     expect(next.hostUniqueId).toBe('newhost');
     expect(next.fontSize).toBe('large');
+    expect(next.archiveEnabled).toBe(false);
+    expect(next.archiveKeepStreams).toBe(7);
     expect(next.eulerApiKey).toBe('secret-key');
     expect(applyBackupSettings(settings, null)).toEqual(settings);
     expect(applyBackupSettings(settings, { followPopup: false }).followPopup).toBe(false);

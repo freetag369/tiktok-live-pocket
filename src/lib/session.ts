@@ -4,7 +4,10 @@ import { applyEvent, createFeedState, resetForNewRoom, type FeedState } from './
 import { GiftCatalog } from './gift-catalog';
 import { normalize } from './normalize';
 import { VisitCounter } from './visits';
-import { loadGiftCatalog, loadVisits, saveGiftCatalog, saveVisits, clearVisits, replaceVisits, loadMemos, saveMemos, replaceMemos, type GiftCatalogRecord } from './db';
+import { loadGiftCatalog, loadVisits, saveGiftCatalog, saveVisits, clearVisits, replaceVisits, loadMemos, saveMemos, replaceMemos, saveArchiveRows, listStreams, loadStreamRows, deleteStream, clearArchive, loadAllArchive, type GiftCatalogRecord } from './db';
+import { streamsToPrune, type StreamRecord } from './archive';
+import type { ArchiveBackup } from './backup';
+import type { FeedRow } from './feed';
 import type { VisitRecord } from './visits';
 import { MemoBook, type MemoPatch, type MemoRecord } from './memos';
 import { EulerSocket, type SocketState } from './euler-socket';
@@ -80,6 +83,8 @@ export class LiveSession {
   private demoStop: (() => void) | null = null;
   private ready: Promise<void>;
   private getSettings: () => Settings;
+  /** アーカイブ保存待ちの行(id → 行)。1 秒ごとに IndexedDB へ。 */
+  private archiveDirty = new Map<string, { roomId: string; row: FeedRow }>();
 
   constructor(getSettings: () => Settings) {
     this.getSettings = getSettings;
@@ -88,6 +93,8 @@ export class LiveSession {
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') this.socket?.wake();
+        // バックグラウンドに回る直前に書き切る(iOS はこの後タイマーが止まる)
+        else void this.persist();
       });
     }
   }
@@ -98,6 +105,7 @@ export class LiveSession {
     this.catalog = new GiftCatalog(g);
     this.memos = new MemoBook(m);
     this.notify();
+    await this.pruneArchive();
   }
 
   whenReady(): Promise<void> {
@@ -149,6 +157,24 @@ export class LiveSession {
     if (v.length) await saveVisits(v);
     if (g.length) await saveGiftCatalog(g);
     if (m.put.length || m.del.length) await saveMemos(m.put, m.del);
+    if (this.archiveDirty.size) {
+      const byRoom = new Map<string, FeedRow[]>();
+      for (const { roomId, row } of this.archiveDirty.values()) {
+        let list = byRoom.get(roomId);
+        if (!list) byRoom.set(roomId, (list = []));
+        list.push(row);
+      }
+      this.archiveDirty.clear();
+      const host = { hostUniqueId: this.room.hostUniqueId, hostNickname: this.room.hostNickname };
+      for (const [roomId, rows] of byRoom) await saveArchiveRows(roomId, rows, host);
+    }
+  }
+
+  /** 設定の保持数を超えた古い配信を消す(受信中の部屋は残す)。 */
+  private async pruneArchive(): Promise<void> {
+    const keep = this.getSettings().archiveKeepStreams;
+    const streams = await listStreams();
+    for (const roomId of streamsToPrune(streams, keep, this.room.roomId)) await deleteStream(roomId);
   }
 
   // ── 接続 ─────────────────────────────────────────────────────────────
@@ -203,6 +229,7 @@ export class LiveSession {
           if (this.room.roomId) this.feed = resetForNewRoom(this.feed);
           this.room = { roomId: e.roomId, hostNickname: e.hostNickname, hostUniqueId: e.hostUniqueId };
           (this.demoVisits ?? this.visits).setRoom(e.roomId);
+          if (!this.demoVisits) void this.persist().then(() => this.pruneArchive());
         } else {
           this.room = { ...this.room, hostNickname: e.hostNickname ?? this.room.hostNickname, hostUniqueId: e.hostUniqueId ?? this.room.hostUniqueId };
         }
@@ -229,6 +256,10 @@ export class LiveSession {
     if (e.kind === 'gift') this.catalog.observe(e, now);
     const next = applyEvent(this.feed, e, meta, e.kind === 'gift' ? this.catalog.iconOf(e.giftId) : undefined);
     if (next !== this.feed) {
+      // デモは本物のアーカイブに残さない。roomInfo 前の行(部屋が不明)も残さない。
+      if (next.lastTouched && this.room.roomId && !this.demoVisits && this.getSettings().archiveEnabled) {
+        this.archiveDirty.set(next.lastTouched.id, { roomId: this.room.roomId, row: next.lastTouched });
+      }
       this.feed = next;
       this.notify();
       // デモは fixture の createTime が固定値なので鮮度は見ない。
@@ -343,14 +374,16 @@ export class LiveSession {
 
   // ── バックアップ ─────────────────────────────────────────────────
 
-  /** 保存待ちを書き切ってから、来店履歴・ギフトカタログ・メモの全件を返す。 */
-  async exportData(): Promise<{ visits: VisitRecord[]; gifts: GiftCatalogRecord[]; memos: MemoRecord[] }> {
+  /** 保存待ちを書き切ってから、来店履歴・ギフトカタログ・メモ(と任意でアーカイブ)の全件を返す。 */
+  async exportData(o: { includeArchive?: boolean } = {}): Promise<{ visits: VisitRecord[]; gifts: GiftCatalogRecord[]; memos: MemoRecord[]; archive?: ArchiveBackup }> {
     await this.persist();
-    return { visits: this.visits.all(), gifts: this.catalog.all(), memos: this.memos.all() };
+    const out: { visits: VisitRecord[]; gifts: GiftCatalogRecord[]; memos: MemoRecord[]; archive?: ArchiveBackup } = { visits: this.visits.all(), gifts: this.catalog.all(), memos: this.memos.all() };
+    if (o.includeArchive) out.archive = await loadAllArchive();
+    return out;
   }
 
   /** バックアップを取り込み、IndexedDB に反映する。 */
-  async importData(o: { visits: VisitRecord[]; gifts: GiftCatalogRecord[]; memos?: MemoRecord[]; mode: 'merge' | 'replace' }): Promise<{ added: number; updated: number; gifts: number; memos: number }> {
+  async importData(o: { visits: VisitRecord[]; gifts: GiftCatalogRecord[]; memos?: MemoRecord[]; archive?: ArchiveBackup | null; mode: 'merge' | 'replace' }): Promise<{ added: number; updated: number; gifts: number; memos: number; streams: number }> {
     const r = this.visits.import(o.visits, o.mode);
     const gifts = this.catalog.import(o.gifts);
     const memos = this.memos.import(o.memos ?? [], o.mode);
@@ -361,8 +394,55 @@ export class LiveSession {
       await replaceMemos(this.memos.all());
     }
     await this.persist();
+    const streams = await this.importArchive(o.archive ?? null, o.mode);
     this.notify();
-    return { ...r, gifts, memos };
+    return { ...r, gifts, memos, streams };
+  }
+
+  /**
+   * アーカイブの取り込み。行は id で上書きし、集計は保存側が差分で数え直すので
+   * 統合でも二重計上しない。配信レコードの host 名だけバックアップの値を引き継ぐ。
+   */
+  private async importArchive(a: ArchiveBackup | null, mode: 'merge' | 'replace'): Promise<number> {
+    if (!a || a.rows.length === 0) return 0;
+    if (mode === 'replace') await clearArchive();
+    const hostOf = new Map<string, StreamRecord>();
+    for (const s of a.streams) hostOf.set(s.roomId, s);
+    const byRoom = new Map<string, FeedRow[]>();
+    for (const { roomId, ...row } of a.rows) {
+      let list = byRoom.get(roomId);
+      if (!list) byRoom.set(roomId, (list = []));
+      list.push(row as FeedRow);
+    }
+    for (const [roomId, rows] of byRoom) {
+      const s = hostOf.get(roomId);
+      await saveArchiveRows(roomId, rows, { hostUniqueId: s?.hostUniqueId, hostNickname: s?.hostNickname });
+    }
+    await this.pruneArchive();
+    return byRoom.size;
+  }
+
+  // ── アーカイブ(閲覧画面から) ───────────────────────────────────
+
+  /** 配信の一覧(新しい順)。受信中の行も書き切ってから返す。 */
+  async listArchive(): Promise<StreamRecord[]> {
+    await this.persist();
+    return listStreams();
+  }
+
+  async loadArchivedStream(roomId: string): Promise<FeedRow[]> {
+    await this.persist();
+    return loadStreamRows(roomId);
+  }
+
+  async deleteArchivedStream(roomId: string): Promise<void> {
+    for (const [id, d] of this.archiveDirty) if (d.roomId === roomId) this.archiveDirty.delete(id);
+    await deleteStream(roomId);
+  }
+
+  async clearArchive(): Promise<void> {
+    this.archiveDirty.clear();
+    await clearArchive();
   }
 
   /** いま画面にある行(書き出し用)。 */

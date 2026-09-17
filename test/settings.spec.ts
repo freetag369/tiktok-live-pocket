@@ -22,4 +22,12 @@ describe('sanitize', () => {
     expect(sanitize({ ...DEFAULT_SETTINGS, followPopup: undefined as never }).followPopup).toBe(true);
     expect(sanitize({ ...DEFAULT_SETTINGS, followPopup: false }).followPopup).toBe(false);
   });
+
+  it('アーカイブの保持数は 1〜500 に丸め、不正なら既定', () => {
+    expect(sanitize({ ...DEFAULT_SETTINGS, archiveKeepStreams: 0 }).archiveKeepStreams).toBe(1);
+    expect(sanitize({ ...DEFAULT_SETTINGS, archiveKeepStreams: 9999 }).archiveKeepStreams).toBe(500);
+    expect(sanitize({ ...DEFAULT_SETTINGS, archiveKeepStreams: 12.7 }).archiveKeepStreams).toBe(12);
+    expect(sanitize({ ...DEFAULT_SETTINGS, archiveKeepStreams: NaN }).archiveKeepStreams).toBe(30);
+    expect(sanitize({ ...DEFAULT_SETTINGS, archiveEnabled: undefined as never }).archiveEnabled).toBe(true);
+  });
 });

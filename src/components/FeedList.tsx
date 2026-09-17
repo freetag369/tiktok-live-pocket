@@ -1,22 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { FeedRow } from '../lib/feed';
+import { filterRows, type FeedRow, type Tab } from '../lib/feed';
 import type { MemoRecord } from '../lib/memos';
 import { FeedRowView } from './FeedRow';
 
-export type Tab = 'all' | 'comment' | 'join' | 'gift';
-
-export function filterRows(rows: FeedRow[], tab: Tab): FeedRow[] {
-  switch (tab) {
-    case 'all':
-      return rows;
-    case 'comment':
-      return rows.filter((r) => r.k === 'comment');
-    case 'join':
-      return rows.filter((r) => r.k === 'join' || r.k === 'social');
-    case 'gift':
-      return rows.filter((r) => r.k === 'gift');
-  }
-}
+export { filterRows, type Tab };
 
 interface Props {
   rows: FeedRow[];
