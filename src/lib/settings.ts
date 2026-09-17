@@ -10,6 +10,8 @@ export interface Settings {
   /** この💎以上のギフトを大きく強調する。 */
   bigGiftDiamonds: number;
   wakeLock: boolean;
+  /** フォローされたら画面上部にポップアップを出す。 */
+  followPopup: boolean;
   /** 詳細: 接続先。LAN のモックサーバーで結線確認するときだけ変える。 */
   wsUrl: string;
 }
@@ -23,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 'medium',
   bigGiftDiamonds: 100,
   wakeLock: true,
+  followPopup: true,
   wsUrl: DEFAULT_WS_URL,
 };
 
@@ -54,6 +57,7 @@ export function sanitize(s: Settings): Settings {
     eulerApiKey: (s.eulerApiKey ?? '').trim(),
     fontSize: (['small', 'medium', 'large'] as const).includes(s.fontSize) ? s.fontSize : 'medium',
     bigGiftDiamonds: Number.isFinite(Number(s.bigGiftDiamonds)) && Number(s.bigGiftDiamonds) >= 0 ? Number(s.bigGiftDiamonds) : 100,
+    followPopup: s.followPopup !== false,
     wsUrl: /^wss?:\/\//.test((s.wsUrl ?? '').trim()) ? s.wsUrl.trim() : DEFAULT_WS_URL,
   };
 }

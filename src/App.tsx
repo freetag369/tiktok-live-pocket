@@ -5,6 +5,8 @@ import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
 import type { FeedRow } from './lib/feed';
+import { FollowToast } from './components/FollowToast';
+import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
 import { LiveSession, type SessionSnapshot } from './lib/session';
 import { loadSettings, sanitize, saveSettings, type Settings } from './lib/settings';
 import { installWakeLockRefresh, setWakeLock } from './lib/wake-lock';
@@ -31,6 +33,17 @@ export function App() {
 
   useEffect(() => session.subscribe(setSnap), [session]);
 
+  const [toast, setToast] = useState<FollowToastState | null>(null);
+  const dismissToast = useCallback(() => setToast(null), []);
+  useEffect(
+    () =>
+      session.onFollow((n) => {
+        if (!settingsRef.current.followPopup) return;
+        setToast((cur) => pushFollow(cur, { name: followerName(n.viewer), avatarUrl: n.viewer.avatarUrl, firstEver: n.firstEver }, Date.now()));
+      }),
+    [session]
+  );
+
   useEffect(() => {
     document.documentElement.dataset.fs = settings.fontSize;
   }, [settings.fontSize]);
@@ -43,6 +56,9 @@ export function App() {
   useEffect(() => {
     void setWakeLock(settings.wakeLock && running);
   }, [settings.wakeLock, running]);
+  useEffect(() => {
+    if (!running) setToast(null);
+  }, [running]);
 
   const updateSettings = (next: Settings) => {
     setSettingsState(next);
@@ -81,6 +97,7 @@ export function App() {
   return (
     <div className="app">
       <Header socket={snap.socket} room={snap.room} hostUniqueId={settings.hostUniqueId} diamonds={f.diamonds} demo={snap.demo} onSettings={() => setShowSettings(true)} />
+      {toast && settings.followPopup ? <FollowToast toast={toast} showAvatars={settings.showAvatars} onDone={dismissToast} /> : null}
       {snap.socket.s === 'error' ? (
         <div className="banner">
           <span>{snap.socket.message}</span>

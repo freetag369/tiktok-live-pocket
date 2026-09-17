@@ -85,6 +85,13 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
           </div>
           <div className="field">
             <label>
+              フォロー通知
+              <small>フォローされたら画面の上にポップアップを出します</small>
+            </label>
+            <input className="switch" type="checkbox" checked={value.followPopup} onChange={(e) => set('followPopup', e.target.checked)} />
+          </div>
+          <div className="field">
+            <label>
               画面を暗くしない
               <small>{wakeLockSupported() ? '受信中はスリープしません(iOS 16.4 以降)' : 'このブラウザでは使えません'}</small>
             </label>

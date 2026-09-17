@@ -61,6 +61,7 @@ describe('backup round trip', () => {
     expect(next.fontSize).toBe('large');
     expect(next.eulerApiKey).toBe('secret-key');
     expect(applyBackupSettings(settings, null)).toEqual(settings);
+    expect(applyBackupSettings(settings, { followPopup: false }).followPopup).toBe(false);
   });
 });
 
