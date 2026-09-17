@@ -105,6 +105,21 @@ describe('feed reducer', () => {
     expect(s.rows[0]!.id).toBe('c20');
   });
 
+  it('lastTouched: 新規行と連打の更新行を指す。重複は state ごと変わらない', () => {
+    let s = createFeedState();
+    expect(s.lastTouched).toBeNull();
+    s = applyEvent(s, comment('a', 'hi'), meta);
+    expect(s.lastTouched?.id).toBe('a');
+    const dup = applyEvent(s, comment('a', 'hi'), meta);
+    expect(dup).toBe(s);
+    let g = createFeedState();
+    for (const e of fixtureEvents('synth-rose-combo.ndjson')) {
+      g = applyEvent(g, e, meta);
+      expect(g.lastTouched?.id).toBe(g.rows[0]!.id);
+    }
+    expect(g.lastTouched).toMatchObject({ k: 'gift', count: 17, streaking: false });
+  });
+
   it('follow / share は行になる、other は出さない', () => {
     let s = createFeedState();
     s = applyEvent(s, { kind: 'social', msgId: 's1', tsMs: NOW, viewer: { userId: 'u1' }, sub: 'follow' }, meta);

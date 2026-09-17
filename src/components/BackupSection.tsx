@@ -16,6 +16,7 @@ type Msg = { kind: 'ok' | 'err'; text: string } | null;
 
 export function BackupSection({ session, settings, onSettings, knownViewers, rowCount }: Props) {
   const [includeKey, setIncludeKey] = useState(false);
+  const [includeArchive, setIncludeArchive] = useState(false);
   const [mode, setMode] = useState<'merge' | 'replace'>('merge');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
@@ -36,21 +37,23 @@ export function BackupSection({ session, settings, onSettings, knownViewers, row
 
   const exportBackup = () =>
     run(async () => {
-      const data = await session.exportData();
-      const b = buildBackup({ settings, visits: data.visits, gifts: data.gifts, memos: data.memos, includeApiKey: includeKey, appVersion: __APP_VERSION__ });
+      const data = await session.exportData({ includeArchive });
+      const b = buildBackup({ settings, visits: data.visits, gifts: data.gifts, memos: data.memos, includeApiKey: includeKey, appVersion: __APP_VERSION__, archive: data.archive });
       const r = await saveTextFile(`live-pocket-backup-${stamp()}.json`, JSON.stringify(b, null, 1), 'application/json');
-      return r === 'cancelled' ? '' : `${data.visits.length.toLocaleString('ja-JP')} 人分・メモ ${data.memos.length.toLocaleString('ja-JP')} 件を書き出しました`;
+      const arch = data.archive ? `・配信 ${data.archive.streams.length} 件` : '';
+      return r === 'cancelled' ? '' : `${data.visits.length.toLocaleString('ja-JP')} 人分・メモ ${data.memos.length.toLocaleString('ja-JP')} 件${arch}を書き出しました`;
     });
 
   const importBackup = (file: File) =>
     run(async () => {
       const parsed = parseBackup(await readTextFile(file));
-      const r = await session.importData({ visits: parsed.visits, gifts: parsed.gifts, memos: parsed.memos, mode });
+      const r = await session.importData({ visits: parsed.visits, gifts: parsed.gifts, memos: parsed.memos, archive: parsed.archive, mode });
       if (parsed.settings) onSettings(applyBackupSettings(settings, parsed.settings));
       const when = parsed.exportedAt ? `(${parsed.exportedAt.slice(0, 10)} のバックアップ)` : '';
+      const arch = r.streams > 0 ? `・配信 ${r.streams} 件` : '';
       return mode === 'replace'
-        ? `${parsed.visits.length.toLocaleString('ja-JP')} 人分・メモ ${parsed.memos.length.toLocaleString('ja-JP')} 件で置き換えました${when}`
-        : `追加 ${r.added} 人・更新 ${r.updated} 人・メモ ${r.memos} 件${when}`;
+        ? `${parsed.visits.length.toLocaleString('ja-JP')} 人分・メモ ${parsed.memos.length.toLocaleString('ja-JP')} 件${arch}で置き換えました${when}`
+        : `追加 ${r.added} 人・更新 ${r.updated} 人・メモ ${r.memos} 件${arch}${when}`;
     });
 
   const exportLog = (fmt: 'csv' | 'json') =>
@@ -79,6 +82,13 @@ export function BackupSection({ session, settings, onSettings, knownViewers, row
             <small>ファイルを人に渡すときは OFF に</small>
           </label>
           <input className="switch" type="checkbox" checked={includeKey} onChange={(e) => setIncludeKey(e.target.checked)} />
+        </div>
+        <div className="field">
+          <label>
+            アーカイブも含める
+            <small>過去の配信のコメント・ギフトも入る。ファイルが大きくなります</small>
+          </label>
+          <input className="switch" type="checkbox" checked={includeArchive} onChange={(e) => setIncludeArchive(e.target.checked)} />
         </div>
         <button className="btn primary" disabled={busy} onClick={exportBackup}>
           ⬆ バックアップを書き出す

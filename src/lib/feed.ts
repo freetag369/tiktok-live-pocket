@@ -59,6 +59,8 @@ export interface FeedState {
   giftCount: number;
   commentCount: number;
   joinCount: number;
+  /** 直近の applyEvent で作成または更新した行(アーカイブ保存用)。state が変わらなければ触らない。 */
+  lastTouched: FeedRow | null;
 }
 
 export const FEED_MAX_ROWS = 500;
@@ -78,6 +80,7 @@ export function createFeedState(): FeedState {
     giftCount: 0,
     commentCount: 0,
     joinCount: 0,
+    lastTouched: null,
   };
 }
 
@@ -124,7 +127,7 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         visits: meta.visits,
         firstEver: meta.firstEver,
       };
-      return { ...s, rows: push(s, row), commentCount: s.commentCount + 1 };
+      return { ...s, rows: push(s, row), commentCount: s.commentCount + 1, lastTouched: row };
     }
 
     case 'join': {
@@ -148,7 +151,7 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         visits: meta.visits,
         firstEver: meta.firstEver,
       };
-      return { ...s, rows: push(s, row), lastJoin, joinCount: s.joinCount + 1 };
+      return { ...s, rows: push(s, row), lastJoin, joinCount: s.joinCount + 1, lastTouched: row };
     }
 
     case 'social': {
@@ -163,7 +166,7 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         visits: meta.visits,
         firstEver: meta.firstEver,
       };
-      return { ...s, rows: push(s, row) };
+      return { ...s, rows: push(s, row), lastTouched: row };
     }
 
     case 'gift': {
@@ -177,6 +180,7 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         const delta = Math.max(0, e.repeatCount - cur.counted);
         const rows = s.rows.slice();
         const idx = rows.findIndex((r) => r.id === cur.rowId);
+        let touched: FeedRow | null = null;
         if (idx >= 0) {
           const old = rows[idx] as Extract<FeedRow, { k: 'gift' }>;
           const count = Math.max(old.count, e.repeatCount);
@@ -188,11 +192,12 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
             iconUrl: old.iconUrl || iconUrl,
             tsMs: e.tsMs,
           };
+          touched = rows[idx]!;
         }
         const streaks = new Map(s.streaks);
         if (e.streaking) streaks.set(key, { rowId: cur.rowId, counted: Math.max(cur.counted, e.repeatCount) });
         else streaks.delete(key);
-        return { ...s, rows, streaks, diamonds: s.diamonds + delta * e.diamondEach };
+        return { ...s, rows, streaks, diamonds: s.diamonds + delta * e.diamondEach, lastTouched: touched };
       }
 
       const row: FeedRow = {
@@ -218,6 +223,7 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         streaks,
         diamonds: s.diamonds + e.repeatCount * e.diamondEach,
         giftCount: s.giftCount + 1,
+        lastTouched: row,
       };
     }
 
@@ -226,7 +232,22 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
   }
 }
 
+export type Tab = 'all' | 'comment' | 'join' | 'gift';
+
+export function filterRows(rows: FeedRow[], tab: Tab): FeedRow[] {
+  switch (tab) {
+    case 'all':
+      return rows;
+    case 'comment':
+      return rows.filter((r) => r.k === 'comment');
+    case 'join':
+      return rows.filter((r) => r.k === 'join' || r.k === 'social');
+    case 'gift':
+      return rows.filter((r) => r.k === 'gift');
+  }
+}
+
 /** 配信が切り替わったとき(roomId が変わった)に呼ぶ。行は残し、集計と重複表だけ捨てる。 */
 export function resetForNewRoom(s: FeedState): FeedState {
-  return { ...s, seen: new Set(), seenOrder: [], streaks: new Map(), lastJoin: new Map(), diamonds: 0, giftCount: 0, commentCount: 0, joinCount: 0 };
+  return { ...s, seen: new Set(), seenOrder: [], streaks: new Map(), lastJoin: new Map(), diamonds: 0, giftCount: 0, commentCount: 0, joinCount: 0, lastTouched: null };
 }

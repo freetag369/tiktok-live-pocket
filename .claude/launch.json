@@ -4,7 +4,12 @@
     {
       "name": "pocket-dev",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--host", "--port", "5173"],
+      "runtimeArgs": [
+        "vite",
+        "--host",
+        "--port",
+        "5173"
+      ],
       "port": 5173,
       "url": "http://localhost:5173"
     },
@@ -14,6 +19,15 @@
       "runtimeArgs": ["vite", "--host", "--port", "5177"],
       "port": 5177,
       "url": "http://localhost:5177"
+    },
+    {
+      "name": "mock-ws",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/mock-ws.mjs",
+        "--loop"
+      ],
+      "port": 8787
     }
   ]
 }

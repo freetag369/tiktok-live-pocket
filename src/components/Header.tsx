@@ -10,6 +10,7 @@ interface Props {
   diamonds: number;
   demo: boolean;
   onSettings: () => void;
+  onArchive: () => void;
 }
 
 function statusText(s: SocketState, room: RoomState, now: number, demo: boolean): string {
@@ -32,7 +33,7 @@ function statusText(s: SocketState, room: RoomState, now: number, demo: boolean)
   }
 }
 
-export function Header({ socket, room, hostUniqueId, diamonds, demo, onSettings }: Props) {
+export function Header({ socket, room, hostUniqueId, diamonds, demo, onSettings, onArchive }: Props) {
   const [now, setNow] = useState(Date.now());
   const ticking = socket.s === 'waitingLive' || socket.s === 'reconnecting';
   useEffect(() => {
@@ -61,6 +62,9 @@ export function Header({ socket, room, hostUniqueId, diamonds, demo, onSettings 
           💎<b>{num(diamonds)}</b>
         </span>
       </div>
+      <button className="iconbtn" onClick={onArchive} aria-label="アーカイブ">
+        🗂
+      </button>
       <button className="iconbtn" onClick={onSettings} aria-label="設定">
         ⚙️
       </button>

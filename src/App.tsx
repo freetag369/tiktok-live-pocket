@@ -7,6 +7,7 @@ import { ViewersSheet } from './components/ViewersSheet';
 import type { FeedRow } from './lib/feed';
 import { FollowToast } from './components/FollowToast';
 import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
+import { ArchiveSheet } from './components/Archive';
 import { LiveSession, type SessionSnapshot } from './lib/session';
 import { loadSettings, sanitize, saveSettings, type Settings } from './lib/settings';
 import { installWakeLockRefresh, setWakeLock } from './lib/wake-lock';
@@ -30,6 +31,7 @@ export function App() {
   const [showSettings, setShowSettings] = useState(() => !settings.hostUniqueId || !settings.eulerApiKey);
   const [showViewers, setShowViewers] = useState(false);
   const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
+  const [showArchive, setShowArchive] = useState(false);
 
   useEffect(() => session.subscribe(setSnap), [session]);
 
@@ -96,7 +98,7 @@ export function App() {
 
   return (
     <div className="app">
-      <Header socket={snap.socket} room={snap.room} hostUniqueId={settings.hostUniqueId} diamonds={f.diamonds} demo={snap.demo} onSettings={() => setShowSettings(true)} />
+      <Header socket={snap.socket} room={snap.room} hostUniqueId={settings.hostUniqueId} diamonds={f.diamonds} demo={snap.demo} onSettings={() => setShowSettings(true)} onArchive={() => setShowArchive(true)} />
       {toast && settings.followPopup ? <FollowToast toast={toast} showAvatars={settings.showAvatars} onDone={dismissToast} /> : null}
       {snap.socket.s === 'error' ? (
         <div className="banner">
@@ -147,6 +149,7 @@ export function App() {
           {connected ? '切断' : snap.demo ? 'デモを止めて接続' : '接続'}
         </button>
       </div>
+      {showArchive ? <ArchiveSheet session={session} settings={settings} currentRoomId={snap.demo ? '' : snap.room.roomId} onClose={() => setShowArchive(false)} /> : null}
       {showSettings ? (
         <SettingsSheet
           value={settings}

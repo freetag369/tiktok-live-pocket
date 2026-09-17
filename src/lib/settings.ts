@@ -14,6 +14,10 @@ export interface Settings {
   followPopup: boolean;
   /** 詳細: 接続先。LAN のモックサーバーで結線確認するときだけ変える。 */
   wsUrl: string;
+  /** 受信した行を配信ごとに IndexedDB に残す(アーカイブ)。 */
+  archiveEnabled: boolean;
+  /** 残す配信の数。古い配信から自動で消える。 */
+  archiveKeepStreams: number;
 }
 
 export const DEFAULT_WS_URL = 'wss://ws.eulerstream.com';
@@ -27,7 +31,12 @@ export const DEFAULT_SETTINGS: Settings = {
   wakeLock: true,
   followPopup: true,
   wsUrl: DEFAULT_WS_URL,
+  archiveEnabled: true,
+  archiveKeepStreams: 30,
 };
+
+export const ARCHIVE_KEEP_MIN = 1;
+export const ARCHIVE_KEEP_MAX = 500;
 
 const KEY = 'tiktok-live-pocket:settings:v1';
 
@@ -59,7 +68,15 @@ export function sanitize(s: Settings): Settings {
     bigGiftDiamonds: Number.isFinite(Number(s.bigGiftDiamonds)) && Number(s.bigGiftDiamonds) >= 0 ? Number(s.bigGiftDiamonds) : 100,
     followPopup: s.followPopup !== false,
     wsUrl: /^wss?:\/\//.test((s.wsUrl ?? '').trim()) ? s.wsUrl.trim() : DEFAULT_WS_URL,
+    archiveEnabled: s.archiveEnabled !== false,
+    archiveKeepStreams: clampKeep(s.archiveKeepStreams),
   };
+}
+
+function clampKeep(v: unknown): number {
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n)) return DEFAULT_SETTINGS.archiveKeepStreams;
+  return Math.min(ARCHIVE_KEEP_MAX, Math.max(ARCHIVE_KEEP_MIN, n));
 }
 
 /**

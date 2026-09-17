@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DEFAULT_WS_URL, type FontSize, type Settings } from '../lib/settings';
+import { ARCHIVE_KEEP_MAX, ARCHIVE_KEEP_MIN, DEFAULT_WS_URL, type FontSize, type Settings } from '../lib/settings';
 import { wakeLockSupported } from '../lib/wake-lock';
 import type { LiveSession } from '../lib/session';
 import { BackupSection } from './BackupSection';
@@ -22,6 +22,8 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
   const [showKey, setShowKey] = useState(false);
   const [advanced, setAdvanced] = useState(value.wsUrl !== DEFAULT_WS_URL);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmClearArchive, setConfirmClearArchive] = useState(false);
+  const [archiveMsg, setArchiveMsg] = useState<string | null>(null);
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...value, [k]: v });
 
   return (
@@ -129,6 +131,48 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
               来店履歴をリセット
             </button>
           )}
+        </div>
+
+        <div className="section">
+          <h2>アーカイブ</h2>
+          <p className="note">受信したコメント・入室・ギフトを配信ごとに残し、右上の 🗂 から見返せます。画面の 500 行より前の分も全部残ります。</p>
+          <div className="field">
+            <label>
+              アーカイブを残す
+              <small>OFF にしても、残っている分は消えません</small>
+            </label>
+            <input className="switch" type="checkbox" checked={value.archiveEnabled} onChange={(e) => set('archiveEnabled', e.target.checked)} />
+          </div>
+          <div className="field">
+            <label>
+              残す配信の数
+              <small>これより古い配信は自動で消えます({ARCHIVE_KEEP_MIN}〜{ARCHIVE_KEEP_MAX})</small>
+            </label>
+            <input type="number" inputMode="numeric" min={ARCHIVE_KEEP_MIN} max={ARCHIVE_KEEP_MAX} value={value.archiveKeepStreams} onChange={(e) => set('archiveKeepStreams', Number(e.target.value))} />
+          </div>
+          {confirmClearArchive ? (
+            <>
+              <p className="err">本当に消しますか? 受信中の配信も含め、すべてのアーカイブが消えます。</p>
+              <button
+                className="btn danger"
+                onClick={async () => {
+                  await session.clearArchive();
+                  setConfirmClearArchive(false);
+                  setArchiveMsg('アーカイブを消しました');
+                }}
+              >
+                全部消す
+              </button>
+              <button className="btn" onClick={() => setConfirmClearArchive(false)}>
+                やめる
+              </button>
+            </>
+          ) : (
+            <button className="btn danger" onClick={() => setConfirmClearArchive(true)}>
+              🗑 アーカイブを全部消す
+            </button>
+          )}
+          {archiveMsg ? <p className="note" style={{ color: 'var(--green)' }}>{archiveMsg}</p> : null}
         </div>
 
         <BackupSection session={session} settings={value} onSettings={onChange} knownViewers={knownViewers} rowCount={rowCount} />
