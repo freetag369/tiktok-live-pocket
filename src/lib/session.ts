@@ -68,6 +68,10 @@ export class LiveSession {
   private feed: FeedState = createFeedState();
   private socketState: SocketState = { s: 'idle' };
   private room: RoomState = { roomId: '' };
+  /** いまの部屋が roomInfo で確定したものなら true(common.roomId では上書きしない)。 */
+  private roomFromInfo = false;
+  /** 来店履歴の読込が終わるまで届いたメッセージ。読込後に流し直す。 */
+  private pending: Array<[string, unknown, number]> | null = [];
   private visits = new VisitCounter();
   /** デモ再生中だけ使う使い捨てカウンタ(本物の来店履歴を汚さない)。 */
   private demoVisits: VisitCounter | null = null;
@@ -100,11 +104,18 @@ export class LiveSession {
   }
 
   private async load(): Promise<void> {
-    const [v, g, m] = await Promise.all([loadVisits(), loadGiftCatalog(), loadMemos()]);
-    this.visits = new VisitCounter(v);
-    this.catalog = new GiftCatalog(g);
-    this.memos = new MemoBook(m);
-    this.notify();
+    try {
+      const [v, g, m] = await Promise.all([loadVisits(), loadGiftCatalog(), loadMemos()]);
+      this.visits = new VisitCounter(v);
+      this.catalog = new GiftCatalog(g);
+      this.memos = new MemoBook(m);
+    } finally {
+      // 読込前に数えると保存済みの人まで「初見」になるので、溜めておいた分をここで流す。
+      const queued = this.pending ?? [];
+      this.pending = null;
+      for (const [type, data, now] of queued) this.ingest(type, data, now);
+      this.notify();
+    }
     await this.pruneArchive();
   }
 
@@ -217,6 +228,10 @@ export class LiveSession {
   // ── 取り込み ───────────────────────────────────────────────────────
 
   ingest(type: string, data: unknown, now = Date.now()): void {
+    if (this.pending) {
+      this.pending.push([type, data, now]);
+      return;
+    }
     const e = normalize(type, data, now);
     if (!e) return;
     this.apply(e, now);
@@ -226,13 +241,11 @@ export class LiveSession {
     switch (e.kind) {
       case 'roomInfo': {
         if (e.roomId !== this.room.roomId) {
-          if (this.room.roomId) this.feed = resetForNewRoom(this.feed);
-          this.room = { roomId: e.roomId, hostNickname: e.hostNickname, hostUniqueId: e.hostUniqueId };
-          (this.demoVisits ?? this.visits).setRoom(e.roomId);
-          if (!this.demoVisits) void this.persist().then(() => this.pruneArchive());
+          this.switchRoom(e.roomId, e.hostNickname, e.hostUniqueId);
         } else {
           this.room = { ...this.room, hostNickname: e.hostNickname ?? this.room.hostNickname, hostUniqueId: e.hostUniqueId ?? this.room.hostUniqueId };
         }
+        this.roomFromInfo = true;
         this.notify();
         return;
       }
@@ -248,6 +261,13 @@ export class LiveSession {
         return;
       default:
         break;
+    }
+
+    // roomInfo が来ない・読めないと来店を数えられず全員「初見」になる。common.roomId で部屋を補う。
+    // roomInfo で確定した部屋は上書きしない。
+    if (e.roomId && e.roomId !== this.room.roomId && !this.roomFromInfo) {
+      this.switchRoom(e.roomId);
+      this.notify();
     }
 
     const v = viewerOf(e);
@@ -270,7 +290,15 @@ export class LiveSession {
     }
   }
 
-  // ── デモ再生(ネット不要) ─────────────────────────────────────────
+  private switchRoom(roomId: string, hostNickname?: string, hostUniqueId?: string): void {
+    if (this.room.roomId) this.feed = resetForNewRoom(this.feed);
+    this.room = { roomId, hostNickname, hostUniqueId };
+    this.roomFromInfo = false;
+    (this.demoVisits ?? this.visits).setRoom(roomId);
+    if (!this.demoVisits) void this.persist().then(() => this.pruneArchive());
+  }
+
+  // ── デモ再生(ネット不要)─────────────────────────────────────────
 
   /** 既存 fixtures 形式(`{o, type, data}` の ndjson)を時間どおりに流す。 */
   playDemo(lines: Array<{ o: number; type?: string; data?: unknown }>, speed = 1): void {
@@ -323,6 +351,7 @@ export class LiveSession {
       this.demoMemos = null;
       // デモの部屋を本物の来店カウンタに残さない。次の roomInfo で切り替わる。
       this.room = { roomId: '' };
+      this.roomFromInfo = false;
       this.feed = resetForNewRoom(this.feed);
     }
   }

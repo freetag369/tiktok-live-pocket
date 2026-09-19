@@ -91,6 +91,36 @@ describe('demo session', () => {
     expect(list[2]).toMatchObject({ visits: 0, nickname: 'G' });
   });
 
+  const chat = (id: string, room: string, msg: string) =>
+    session.ingest('WebcastChatMessage', { common: { msgId: msg, roomId: room }, user: { id, nickname: id }, content: 'x' });
+  const metaOf = (msg: string) => session.rows.find((r) => r.id === msg) as unknown as { visits: number; firstEver: boolean };
+
+  it('roomInfo が無くても common.roomId で配信を数え、次の配信では 2回目', () => {
+    chat('u1', 'roomA', 'a1');
+    expect(session.roomInfo.roomId).toBe('roomA');
+    expect(metaOf('a1')).toMatchObject({ visits: 1, firstEver: true });
+    chat('u1', 'roomB', 'b1');
+    expect(session.roomInfo.roomId).toBe('roomB');
+    expect(metaOf('b1')).toMatchObject({ visits: 2, firstEver: false });
+  });
+
+  it('roomInfo で確定した部屋は、別の common.roomId で変わらない', () => {
+    session.ingest('roomInfo', { data: { id_str: 'r1' } });
+    chat('u1', 'other', 'c1');
+    expect(session.roomInfo.roomId).toBe('r1');
+  });
+
+  it('読込前に届いたメッセージは読込後に数える', async () => {
+    const s = new LiveSession(() => ({ ...DEFAULT_SETTINGS }));
+    s.ingest('roomInfo', { data: { id_str: 'r9' } });
+    s.ingest('WebcastChatMessage', { common: { msgId: 'p1' }, user: { id: 'u9' }, content: 'x' });
+    await s.whenReady();
+    expect(s.roomInfo.roomId).toBe('r9');
+    expect(s.rows).toHaveLength(1);
+    expect(s.snapshot().knownViewers).toBe(1);
+    s.disconnect();
+  });
+
   it('連打途中で再デモしても古いタイマーと連打状態を引き継がない', () => {
     session.playDemo(demo);
     vi.advanceTimersByTime(4700);

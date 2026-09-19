@@ -108,6 +108,13 @@ describe('normalize (v2 = Euler Cloud WebSocket)', () => {
     expect(e).toMatchObject({ kind: 'roomInfo', roomId: '7450000000000000000', hostNickname: 'ようくん', hostUniqueId: 'metafact8' });
   });
 
+  it('common.roomId をイベントの roomId に載せる("0" は載せない)', () => {
+    const a = normalize('WebcastChatMessage', { common: { msgId: 'm', roomId: '7450000000000000001' }, user: { id: 'u' }, content: 'x' }, NOW);
+    expect(a?.roomId).toBe('7450000000000000001');
+    const b = normalize('WebcastChatMessage', { common: { msgId: 'm', roomId: '0' }, user: { id: 'u' }, content: 'x' }, NOW);
+    expect(b?.roomId).toBeUndefined();
+  });
+
   it('roomUser: total が同接、totalUser(累計)は使わない', () => {
     const e = normalize('WebcastRoomUserSeqMessage', { common: { msgId: '19' }, total: '500', totalUser: '12000' }, NOW);
     expect(e).toMatchObject({ kind: 'roomStats', viewerCount: 500 });
