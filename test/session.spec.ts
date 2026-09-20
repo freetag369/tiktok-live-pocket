@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveSession } from '../src/lib/session';
 import { createFeedState } from '../src/lib/feed';
+import { rankLikes } from '../src/lib/likes';
 import { DEFAULT_SETTINGS } from '../src/lib/settings';
 
 const demo = readFileSync(new URL('../src/fixtures/demo.ndjson', import.meta.url), 'utf8')
@@ -100,5 +101,30 @@ describe('demo session', () => {
     vi.advanceTimersByTime(15000);
     expect(session.snapshot().feed).toMatchObject({ giftCount: 4, diamonds: 1717 });
     expect(session.rows.filter((row) => row.k === 'gift')).toHaveLength(4);
+  });
+
+  it('デモのいいねが人ごとに集計され、ランキングになる', () => {
+    session.playDemo(demo);
+    vi.advanceTimersByTime(15000);
+    const f = session.snapshot().feed;
+    expect(f.likeCount).toBe(40);
+    expect(f.likes.size).toBe(6);
+    expect(f.likeRoomTotal).toBe(157);
+    expect(rankLikes(f.likes, 3).map((e) => [e.viewer.nickname, e.taps])).toEqual([
+      ['さくら🌸', 15],
+      ['ゆな', 10],
+      ['あお', 9],
+    ]);
+  });
+
+  it('clearFeed は行だけ消し、いいね集計は残す', () => {
+    session.ingest('WebcastChatMessage', { common: { msgId: 'c1' }, user: { id: 'v1' }, content: 'hi' });
+    session.ingest('WebcastLikeMessage', { common: { msgId: 'l1' }, user: { id: 'v1' }, count: 4, total: '10' });
+    session.ingest('WebcastLikeMessage', { common: { msgId: 'l2' }, user: { id: 'v1' }, count: 2, total: '12' });
+    session.clearFeed();
+    const f = session.snapshot().feed;
+    expect(f.rows).toHaveLength(0);
+    expect(f.likes.get('v1')?.taps).toBe(6);
+    expect(f.likeCount).toBe(6);
   });
 });

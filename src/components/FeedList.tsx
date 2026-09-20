@@ -4,6 +4,8 @@ import type { MemoRecord } from '../lib/memos';
 import { FeedRowView } from './FeedRow';
 
 export { filterRows, type Tab };
+/** 画面のタブ全体。いいねはランキング画面なので行を流さない。 */
+export type ScreenTab = Tab | 'like';
 
 interface Props {
   rows: FeedRow[];

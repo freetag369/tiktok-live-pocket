@@ -12,6 +12,8 @@ export interface Settings {
   wakeLock: boolean;
   /** フォローされたら画面上部にポップアップを出す。 */
   followPopup: boolean;
+  /** いいねを右下のポップアップで知らせる。 */
+  likePopup: boolean;
   /** 詳細: 接続先。LAN のモックサーバーで結線確認するときだけ変える。 */
   wsUrl: string;
   /** 受信した行を配信ごとに IndexedDB に残す(アーカイブ)。 */
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bigGiftDiamonds: 100,
   wakeLock: true,
   followPopup: true,
+  likePopup: true,
   wsUrl: DEFAULT_WS_URL,
   archiveEnabled: true,
   archiveKeepStreams: 30,
@@ -67,6 +70,7 @@ export function sanitize(s: Settings): Settings {
     fontSize: (['small', 'medium', 'large'] as const).includes(s.fontSize) ? s.fontSize : 'medium',
     bigGiftDiamonds: Number.isFinite(Number(s.bigGiftDiamonds)) && Number(s.bigGiftDiamonds) >= 0 ? Number(s.bigGiftDiamonds) : 100,
     followPopup: s.followPopup !== false,
+    likePopup: typeof s.likePopup === 'boolean' ? s.likePopup : true,
     wsUrl: /^wss?:\/\//.test((s.wsUrl ?? '').trim()) ? s.wsUrl.trim() : DEFAULT_WS_URL,
     archiveEnabled: s.archiveEnabled !== false,
     archiveKeepStreams: clampKeep(s.archiveKeepStreams),

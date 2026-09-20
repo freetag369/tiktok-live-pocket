@@ -71,6 +71,13 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
             <input className="switch" type="checkbox" checked={value.showAvatars} onChange={(e) => set('showAvatars', e.target.checked)} />
           </div>
           <div className="field">
+            <label>
+              いいねの通知を表示
+              <small>右下に「❤️ +N」をポップアップ。ランキングは「いいね」タブ</small>
+            </label>
+            <input className="switch" type="checkbox" checked={value.likePopup} onChange={(e) => set('likePopup', e.target.checked)} />
+          </div>
+          <div className="field">
             <label>文字サイズ</label>
             <select value={value.fontSize} onChange={(e) => set('fontSize', e.target.value as FontSize)}>
               <option value="small">小</option>

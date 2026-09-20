@@ -1,4 +1,5 @@
 import type { GiftEvent, NormalizedEvent, Viewer } from './events';
+import { touchLike, type LikeEntry } from './likes';
 
 /** 画面に並ぶ 1 行。UI はこれだけを描く。 */
 export type FeedRow =
@@ -61,6 +62,12 @@ export interface FeedState {
   joinCount: number;
   /** 直近の applyEvent で作成または更新した行(アーカイブ保存用)。state が変わらなければ触らない。 */
   lastTouched: FeedRow | null;
+  /** この配信のいいね集計: userId → エントリ(行にはしない)。Map はその場で更新する。 */
+  likes: Map<string, LikeEntry>;
+  /** この配信の合計タップ数。いいねが入るたび必ず増えるので、UI はこれを更新の印にする。 */
+  likeCount: number;
+  /** TikTok が送ってくる部屋全体の累計いいね(接続前の分も含む)。見た中の最大値。 */
+  likeRoomTotal?: number;
 }
 
 export const FEED_MAX_ROWS = 500;
@@ -81,6 +88,8 @@ export function createFeedState(): FeedState {
     commentCount: 0,
     joinCount: 0,
     lastTouched: null,
+    likes: new Map(),
+    likeCount: 0,
   };
 }
 
@@ -113,9 +122,18 @@ function streakKey(e: GiftEvent): string {
 /**
  * イベントを 1 件取り込み、新しい state を返す(rows は変更時だけ差し替える)。
  * `meta` は来店カウンタが決めた「何回目/初見」。
+ * `now` は受信時のローカル時刻(いいねの連打判定に使う。createTime はサーバ時刻でズレる)。
  */
-export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, iconFallback?: string): FeedState {
+export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, iconFallback?: string, now: number = e.tsMs): FeedState {
   switch (e.kind) {
+    case 'like': {
+      if (e.count <= 0) return s;
+      if (!remember(s, e.msgId)) return s;
+      touchLike(s.likes, e, meta, now);
+      const likeRoomTotal = e.roomTotal != null ? Math.max(s.likeRoomTotal ?? 0, e.roomTotal) : s.likeRoomTotal;
+      return { ...s, likeCount: s.likeCount + e.count, likeRoomTotal, lastTouched: null };
+    }
+
     case 'comment': {
       if (!remember(s, e.msgId)) return s;
       const row: FeedRow = {
@@ -249,5 +267,5 @@ export function filterRows(rows: FeedRow[], tab: Tab): FeedRow[] {
 
 /** 配信が切り替わったとき(roomId が変わった)に呼ぶ。行は残し、集計と重複表だけ捨てる。 */
 export function resetForNewRoom(s: FeedState): FeedState {
-  return { ...s, seen: new Set(), seenOrder: [], streaks: new Map(), lastJoin: new Map(), diamonds: 0, giftCount: 0, commentCount: 0, joinCount: 0, lastTouched: null };
+  return { ...s, seen: new Set(), seenOrder: [], streaks: new Map(), lastJoin: new Map(), diamonds: 0, giftCount: 0, commentCount: 0, joinCount: 0, lastTouched: null, likes: new Map(), likeCount: 0, likeRoomTotal: undefined };
 }

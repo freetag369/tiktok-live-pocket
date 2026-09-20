@@ -138,7 +138,8 @@ img {
 }
 .tabs button {
   flex: 1;
-  padding: 9px 0;
+  min-width: 0;
+  padding: 9px 2px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -151,10 +152,19 @@ img {
   border-bottom-color: var(--accent);
 }
 .tabs button .n {
-  margin-left: 4px;
+  margin-left: 3px;
   color: var(--fg-faint);
   font-weight: 500;
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
+}
+
+.feed-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
 .feed {
@@ -980,4 +990,170 @@ img {
   margin: 0;
   padding: 11px 6px;
   font-size: var(--fs-sm);
+}
+
+/* ── いいね通知(右下) ─────────────────────────────────────── */
+.like-toasts {
+  position: absolute;
+  right: 10px;
+  bottom: calc(var(--safe-bottom) + 56px); /* 「↓ 新着」ピルの上 */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 62%;
+  pointer-events: none;
+  z-index: 3; /* .newer(2) より上、.sheet(10) より下 */
+}
+.like-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 5px 12px 5px 5px;
+  border-radius: 999px;
+  background: rgba(27, 31, 42, 0.94);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  font-size: var(--fs-sm);
+  animation: liketoastin 0.18s ease-out;
+}
+@keyframes liketoastin {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+.like-toast .avatar {
+  width: 26px;
+  height: 26px;
+  font-size: var(--fs-xs);
+}
+.like-toast .who {
+  font-weight: 700;
+  max-width: 8em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.like-toast .burst {
+  color: var(--pink);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: pulse 0.4s ease-out;
+}
+.like-toast .sub {
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+/* ── いいねランキング ────────────────────────────────────── */
+.rank {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--safe-bottom) + 8px);
+}
+.rank-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.rank-head b {
+  color: var(--pink);
+  font-size: var(--fs);
+  font-weight: 800;
+}
+.rank-head .room {
+  margin-left: auto;
+  color: var(--fg-faint);
+}
+.rank-now {
+  flex: none;
+  padding: 4px 12px;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  border-bottom: 1px solid var(--line-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rank-now .who {
+  color: var(--pink);
+  font-weight: 700;
+}
+.rank-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 3px solid transparent;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.rank-row .pos {
+  flex: none;
+  width: 2em;
+  text-align: right;
+  color: var(--fg-faint);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rank-row.top3 .pos {
+  color: var(--gold);
+}
+.rank-row .body {
+  flex: 1;
+  min-width: 0;
+}
+.rank-row .head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  line-height: 1.3;
+}
+.rank-row .who {
+  font-weight: 700;
+}
+.rank-row .handle {
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+}
+.rank-row .taps {
+  flex: none;
+  color: var(--pink);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.rank-row.live {
+  border-left-color: var(--pink);
+  background: rgba(255, 92, 138, 0.1);
+}
+.rank-row.live .avatar {
+  box-shadow: 0 0 0 2px var(--pink), 0 0 10px rgba(255, 92, 138, 0.6);
+}
+.rank-row.live .burst {
+  color: var(--pink);
+  font-weight: 800;
+  font-size: var(--fs-sm);
+  animation: pulse 0.4s ease-out;
 }

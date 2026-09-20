@@ -1,6 +1,6 @@
 # TikTok LIVE ポケット
 
-TikTok LIVE の **コメント・入室(初見 / 何回目)・ギフト(画像つき)** を、配信用スマホとは別の iPhone で見るためのアプリです。
+TikTok LIVE の **コメント・入室(初見 / 何回目)・ギフト(画像つき)・いいね(通知とランキング)** を、配信用スマホとは別の iPhone で見るためのアプリです。
 PC は不要で、iPhone 単体で [Euler Stream](https://www.eulerstream.com/) の Cloud WebSocket に直接つないで受信します。
 
 Safari で開いて「ホーム画面に追加」すると、全画面のアプリとして使えます(PWA)。
@@ -23,10 +23,11 @@ Safari で開いて「ホーム画面に追加」すると、全画面のアプ�
 | 場所 | 内容 |
 |---|---|
 | ヘッダ | 接続状態(● 緑=受信中 / 黄=接続・待機中 / 赤=停止)、配信者名、同接 👀、この配信の累計 💎 |
-| タブ | すべて / コメント / 入室 / ギフト(ギフトタブは画像が大きい) |
+| タブ | すべて / コメント / 入室 / ギフト(ギフトタブは画像が大きい)/ いいね(この配信のタップ数ランキング。直近 3 秒にタップした人は行が光り、上の「いま:」に名前が出る) |
 | 行 | アイコン + 名前 + **初見** または **N回目** バッジ。ギフターレベル(バッジ)持ちの入室は **Lv.N** 付きで出ます(TikTok はこの入室を別種のメッセージで送るため、専用に拾っています)。ギフトは画像 + 名前 + ×連打数 + 💎。しきい値(既定 100💎)以上は金枠で大きく。リスナーメモがある人は名前の横に **(よみがな)**、下に **📝 メモ** が金色で出ます |
 | 行をタップ | その人の **メモ・よみがな** を書くシートが開きます(配信中でも配信後でも) |
 | 下 | 新着は下に積まれます。上にスクロールすると追従が止まり「↓ 新着 N 件」で戻れます |
+| 右下 | いいねが届くと「❤️ +N」のポップアップ(最大 3 人、連打中は数が伸びて 3 秒で消える)。設定の「いいねの通知を表示」で OFF にできます |
 | 🗂 アーカイブ | 配信ごとにコメント・入室・ギフトを全部残して見返せます(下記) |
 
 ## 来店回数の数え方
@@ -114,10 +115,11 @@ src/lib/
   memos.ts          リスナーメモ(メモ + よみがな。来店履歴とは別ストア)
   feed.ts           画面の行(連打の同一行更新・msgId 重複排除・上限 500 行)
   archive.ts        アーカイブの集計・絞り込み・自動削除の判定(IndexedDB 非依存)
+  likes.ts          いいね集計(人ごとのタップ数・連打・ランキング。配信ごとにリセット、保存しない)
   gift-catalog.ts   giftId → 画像/名前/💎 のキャッシュ
   db.ts             IndexedDB(来店履歴・ギフトカタログ・アーカイブの行と配信集計)
   session.ts        上記の配線 + IndexedDB への保存
-src/components/     Header / FeedList / FeedRow / MemoSheet / ViewersSheet / Settings / Archive / Avatar / Badges
+src/components/     Header / FeedList / FeedRow / MemoSheet / ViewersSheet / Settings / Archive / LikeRanking / LikeToasts / Avatar / Badges
 scripts/
   mock-ws.mjs       モック WebSocket サーバー
   make-demo.mjs     デモ用 fixture 生成
