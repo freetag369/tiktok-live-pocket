@@ -1,4 +1,5 @@
 import type { GiftCatalogRecord } from './db';
+import { japaneseGiftName } from './gift-names';
 import type { FeedRow } from './feed';
 import { sanitize, type Settings } from './settings';
 import { sanitizeRecord, type VisitRecord } from './visits';
@@ -124,7 +125,7 @@ export function rowToCsvFields(r: FeedRow): string[] {
     case 'social':
       return [...base, r.sub === 'follow' ? 'フォロー' : 'シェア', ...who, '', '', '', '', ...tail];
     case 'gift':
-      return [...base, 'ギフト', ...who, r.giftName, r.giftId, String(r.count), String(r.diamonds), ...tail];
+      return [...base, 'ギフト', ...who, japaneseGiftName(r.giftName, r.giftId), r.giftId, String(r.count), String(r.diamonds), ...tail];
   }
 }
 
