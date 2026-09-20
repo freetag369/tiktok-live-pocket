@@ -18,6 +18,8 @@ export interface Viewer {
 interface Base {
   msgId: string;
   tsMs: number;
+  /** メッセージ共通部(common.roomId)の部屋 ID。roomInfo が取れないときの保険。 */
+  roomId?: string;
 }
 
 export type JoinEvent = Base & { kind: 'join'; viewer: Viewer; action: number };

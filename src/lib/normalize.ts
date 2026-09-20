@@ -80,14 +80,23 @@ function barrageUser(data: Any): Any | null {
  * `type` は Euler の封筒の type("WebcastChatMessage" 等)または既存 fixtures の type。
  */
 export function normalize(type: string, raw: unknown, now = Date.now()): NormalizedEvent | null {
+  const e = normalizeOne(type, raw, now);
+  if (!e || e.kind === 'roomInfo') return e;
+  // roomInfo が届かない・形が違うときでも部屋を特定できるよう、全メッセージの common.roomId を載せる。
+  const roomId = idStr((raw as Any)?.common?.roomId);
+  if (roomId && roomId !== '0') e.roomId = roomId;
+  return e;
+}
+
+function normalizeOne(type: string, raw: unknown, now: number): NormalizedEvent | null {
   if (!raw || typeof raw !== 'object') return null;
   const data = raw as Any;
 
   switch (type) {
     case 'roomInfo': {
       // Euler は接続直後に roomInfo を 1 通送る。形は TikTok の room_info API そのもの。
-      const d = (data.data ?? data) as Any;
-      const roomId = idStr(d.id_str ?? d.idStr ?? d.id ?? d.roomId ?? data.roomId);
+      const d = (data.data ?? data.roomInfo ?? data) as Any;
+      const roomId = idStr(d.id_str ?? d.idStr ?? d.id ?? d.roomId ?? d.room_id ?? data.roomId ?? data.room_id);
       if (!roomId) return null;
       const owner = (d.owner ?? {}) as Any;
       return {
