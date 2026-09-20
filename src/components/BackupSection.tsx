@@ -121,7 +121,7 @@ export function BackupSection({ session, settings, onSettings, knownViewers, row
 
       <div className="section">
         <h2>配信ログの書き出し</h2>
-        <p className="note">いま画面に出ている {rowCount} 行(コメント・入室・フォロー・ギフト)を書き出します。CSV は Excel / Numbers でそのまま開けます。</p>
+        <p className="note">いま画面にある {rowCount} 行(🧹 でリセットするまでの分。配信をまたぐこともあります)を書き出します。CSV は Excel / Numbers でそのまま開けます。</p>
         <button className="btn" disabled={busy || rowCount === 0} onClick={() => exportLog('csv')}>
           📄 CSV で書き出す
         </button>

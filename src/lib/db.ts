@@ -1,7 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { VisitRecord } from './visits';
 import type { MemoRecord } from './memos';
-import type { FeedRow } from './feed';
+import type { FeedRow, ScreenItem, ScreenMeta } from './feed';
 import { applyRowToStream, type ArchivedRow, type HostInfo, type StreamRecord } from './archive';
 
 export interface GiftCatalogRecord {
@@ -20,11 +20,17 @@ interface PocketDB extends DBSchema {
   logRows: { key: string; value: ArchivedRow; indexes: { byRoomTs: [string, number] } };
   /** 配信ごとの集計(一覧用)。 */
   streams: { key: string; value: StreamRecord };
+  /** 画面の履歴(🧹 でリセットするまで残る行と配信の区切り)。seq が並び順。 */
+  screenRows: { key: string; value: ScreenItem };
+  /** 画面の履歴の付帯情報(集計・重複表・連打)。'current' の 1 件だけ。 */
+  screenMeta: { key: string; value: ScreenMetaRecord };
 }
 
+export type ScreenMetaRecord = ScreenMeta & { k: 'current' };
+
 const DB_NAME = 'tiktok-live-pocket';
-/** v2: memos(リスナーメモ)、v3: logRows / streams(アーカイブ)を追加。 */
-const DB_VERSION = 3;
+/** v2: memos(リスナーメモ)、v3: logRows / streams(アーカイブ)、v4: screenRows / screenMeta(画面の履歴)。 */
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<PocketDB>> | null = null;
 
@@ -40,6 +46,16 @@ export function getDb(): Promise<IDBPDatabase<PocketDB>> {
           rows.createIndex('byRoomTs', ['roomId', 'tsMs']);
         }
         if (!db.objectStoreNames.contains('streams')) db.createObjectStore('streams', { keyPath: 'roomId' });
+        if (!db.objectStoreNames.contains('screenRows')) db.createObjectStore('screenRows', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('screenMeta')) db.createObjectStore('screenMeta', { keyPath: 'k' });
+      },
+      // 別のタブが古いバージョンを掴んだままだと次の版上げが止まるので、こちらを閉じる。
+      blocking() {
+        void dbPromise?.then((db) => db.close());
+        dbPromise = null;
+      },
+      terminated() {
+        dbPromise = null;
       },
     });
   }
@@ -234,4 +250,68 @@ export async function loadAllArchive(): Promise<{ streams: StreamRecord[]; rows:
   } catch {
     return { streams: [], rows: [] };
   }
+}
+
+// ── 画面の履歴(🧹 でリセットするまで残る分) ─────────────────────────
+
+/** 画面に出ている行と区切りを、順番つきで全部返す。 */
+export async function loadScreen(): Promise<{ items: ScreenItem[]; meta: ScreenMeta | null }> {
+  try {
+    const db = await getDb();
+    const [items, meta] = await Promise.all([db.getAll('screenRows'), db.get('screenMeta', 'current')]);
+    return { items, meta: meta ? metaOf(meta) : null };
+  } catch {
+    return { items: [], meta: null };
+  }
+}
+
+/** 行と付帯情報を 1 トランザクションで書く。既にある行は seq(並び順)を引き継ぐ。 */
+export async function saveScreen(items: ScreenItem[], meta: ScreenMeta | null): Promise<void> {
+  if (items.length === 0 && !meta) return;
+  try {
+    const db = await getDb();
+    const tx = db.transaction(['screenRows', 'screenMeta'], 'readwrite');
+    const store = tx.objectStore('screenRows');
+    for (const item of items) {
+      const prev = await store.get(item.id);
+      void store.put(prev ? { ...item, seq: prev.seq } : item);
+    }
+    if (meta) void tx.objectStore('screenMeta').put({ ...meta, k: 'current' });
+    await tx.done;
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 🧹 いまの画面で置き換える(消してから書き直す)。 */
+export async function replaceScreen(items: ScreenItem[], meta: ScreenMeta | null): Promise<void> {
+  try {
+    const db = await getDb();
+    const tx = db.transaction(['screenRows', 'screenMeta'], 'readwrite');
+    const store = tx.objectStore('screenRows');
+    await store.clear();
+    for (const item of items) void store.put(item);
+    if (meta) void tx.objectStore('screenMeta').put({ ...meta, k: 'current' });
+    await tx.done;
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 上限を超えて画面から落ちた行を捨てる(起動時の掃除)。 */
+export async function deleteScreenRows(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  try {
+    const db = await getDb();
+    const tx = db.transaction('screenRows', 'readwrite');
+    for (const id of ids) void tx.store.delete(id);
+    await tx.done;
+  } catch {
+    /* ignore */
+  }
+}
+
+function metaOf(r: ScreenMetaRecord): ScreenMeta {
+  const { k: _k, ...meta } = r;
+  return meta;
 }

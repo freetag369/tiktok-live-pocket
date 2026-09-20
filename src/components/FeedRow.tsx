@@ -27,7 +27,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
   switch (row.k) {
     case 'comment':
       return (
-        <div className={`row comment${extra}`} onClick={click}>
+        <div className={`row comment${extra}`} data-id={row.id} onClick={click}>
           <Avatar url={v.avatarUrl} name={name} enabled={showAvatars} />
           <div className="body">
             <div className="head">
@@ -46,7 +46,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
 
     case 'join':
       return (
-        <div className={`row join${extra}`} onClick={click}>
+        <div className={`row join${extra}`} data-id={row.id} onClick={click}>
           <Avatar url={v.avatarUrl} name={name} enabled={showAvatars} />
           <div className="body">
             <div className="head">
@@ -64,7 +64,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
 
     case 'social':
       return (
-        <div className={`row social${extra}`} onClick={click}>
+        <div className={`row social${extra}`} data-id={row.id} onClick={click}>
           <Avatar url={v.avatarUrl} name={name} enabled={showAvatars} />
           <div className="body">
             <div className="head">
@@ -82,7 +82,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
     case 'gift': {
       const big = bigGiftDiamonds > 0 && row.diamonds >= bigGiftDiamonds;
       return (
-        <div className={`row gift${big ? ' big' : ''}${extra}`} onClick={click}>
+        <div className={`row gift${big ? ' big' : ''}${extra}`} data-id={row.id} onClick={click}>
           <GiftIcon url={row.iconUrl} />
           <div className="body">
             <div className="head">

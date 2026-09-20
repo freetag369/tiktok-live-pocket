@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { filterRows, type FeedRow, type Tab } from '../lib/feed';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { countAfter, filterRows, reconcileWindow, tailWindow, type FeedItem, type FeedRow, type Tab } from '../lib/feed';
+import { dateRange, num } from '../lib/format';
 import type { MemoRecord } from '../lib/memos';
 import { FeedRowView } from './FeedRow';
 
@@ -7,8 +8,13 @@ export { filterRows, type Tab };
 /** 画面のタブ全体。いいねはランキング画面なので行を流さない。 */
 export type ScreenTab = Tab | 'like';
 
+/** 一度に描く行数。これより前は「↑ さらに前」で足す(行が何万あっても DOM は軽いまま)。 */
+export const WINDOW = 300;
+/** 最下部に戻ったとみなす余白。 */
+const BOTTOM_SLACK = 40;
+
 interface Props {
-  rows: FeedRow[];
+  rows: FeedItem[];
   tab: Tab;
   showAvatars: boolean;
   bigGiftDiamonds: number;
@@ -18,66 +24,183 @@ interface Props {
   onTapRow?: (row: FeedRow) => void;
 }
 
+/** 追従を止めている間の窓。止めた時の行をそのまま保ち、新着は下に少しだけ足す。 */
+interface Frozen {
+  items: FeedItem[];
+  appendLeft: number;
+  tail: { id: string; tsMs: number } | null;
+}
+
+function lastRowOf(items: FeedItem[]): { id: string; tsMs: number } | null {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i]!;
+    if (it.k !== 'room') return { id: it.id, tsMs: it.tsMs };
+  }
+  return null;
+}
+
+function rowNode(el: HTMLElement, id: string): HTMLElement | null {
+  const inner = el.firstElementChild;
+  if (!inner) return null;
+  for (const kid of Array.from(inner.children)) {
+    if ((kid as HTMLElement).dataset?.id === id) return kid as HTMLElement;
+  }
+  return null;
+}
+
+/** いま画面の上端にある行(二分探索)。「さらに前」で上に足したあとの位置合わせに使う。 */
+function topRow(el: HTMLElement): { id: string; top: number } | null {
+  const inner = el.firstElementChild;
+  if (!inner) return null;
+  const kids = inner.children;
+  const y = el.scrollTop;
+  let lo = 0;
+  let hi = kids.length - 1;
+  let found = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const k = kids[mid] as HTMLElement;
+    if (k.offsetTop + k.offsetHeight > y) {
+      found = mid;
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  for (let i = found; i < kids.length; i++) {
+    const k = kids[i] as HTMLElement;
+    const id = k.dataset?.id;
+    if (id) return { id, top: k.offsetTop };
+  }
+  return null;
+}
+
 /**
  * 新着は下に積まれ、最下部にいる間は自動で追従する。上へスクロールしたら追従を止め、
  * 「↓ 新着 N 件」で戻る(既存 PC アプリの見逃し防止と同じ思想)。
+ * 追従を止めている間は表示中の行を動かさない(上限で落ちた入室も消さない)ので、画面が跳ねない。
  */
 export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos, onTapRow }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pinned, setPinned] = useState(true);
-  const [unseen, setUnseen] = useState(0);
-  const lastLen = useRef(0);
-  const visible = filterRows(rows, tab);
+  const pinnedRef = useRef(true);
+  const frozen = useRef<Frozen | null>(null);
+  const shownRef = useRef<FeedItem[]>([]);
+  /** 「さらに前」で上に行が増えたときだけ使うスクロール補正。 */
+  const anchor = useRef<{ id: string; top: number } | null>(null);
+  const [, bump] = useState(0);
 
-  const atBottom = (el: HTMLDivElement) => el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  const items = useMemo(() => filterRows(rows, tab), [rows, tab]);
 
-  const onScroll = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const b = atBottom(el);
-    setPinned(b);
-    if (b) setUnseen(0);
-  }, []);
+  let shown: FeedItem[];
+  let hiddenBefore: number;
+  let appended = 0;
+  const win = pinned ? null : frozen.current;
+  if (win) {
+    const w = reconcileWindow(win.items, items, win.appendLeft);
+    if (w.stale) {
+      shown = tailWindow(items, WINDOW);
+      hiddenBefore = items.length - shown.length;
+    } else {
+      shown = w.items;
+      hiddenBefore = w.hiddenBefore;
+      appended = w.appended;
+    }
+  } else {
+    shown = tailWindow(items, WINDOW);
+    hiddenBefore = items.length - shown.length;
+  }
+  const unseen = pinned ? 0 : countAfter(items, frozen.current?.tail ?? null);
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (pinned) {
-      el.scrollTop = el.scrollHeight;
-      setUnseen(0);
-    } else if (visible.length > lastLen.current) {
-      setUnseen((n) => n + (visible.length - lastLen.current));
+    shownRef.current = shown;
+    if (frozen.current) {
+      frozen.current.items = shown;
+      frozen.current.appendLeft = Math.max(0, frozen.current.appendLeft - appended);
     }
-    lastLen.current = visible.length;
-  }, [visible.length, pinned, tab]);
+    if (pinnedRef.current) {
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+    const a = anchor.current;
+    if (!a) return;
+    anchor.current = null;
+    const node = rowNode(el, a.id);
+    if (!node) return;
+    const d = node.offsetTop - a.top;
+    if (Math.abs(d) >= 1) el.scrollTop += d;
+  });
 
+  // バナーの開閉・文字サイズ・回転で高さが変わっても、追従中は下に張り付く。
   useEffect(() => {
-    // タブ切替時は必ず最下部へ
-    setPinned(true);
-    setUnseen(0);
     const el = ref.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [tab]);
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (pinnedRef.current && ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const onScroll = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_SLACK;
+    if (bottom === pinnedRef.current) return;
+    pinnedRef.current = bottom;
+    if (bottom) frozen.current = null;
+    else frozen.current = { items: shownRef.current, appendLeft: WINDOW, tail: lastRowOf(shownRef.current) };
+    setPinned(bottom);
+  }, []);
 
   const jump = () => {
-    const el = ref.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    frozen.current = null;
+    pinnedRef.current = true;
     setPinned(true);
-    setUnseen(0);
+  };
+
+  const showEarlier = () => {
+    const el = ref.current;
+    if (!el || hiddenBefore <= 0) return;
+    const cur = frozen.current ?? { items: shownRef.current, appendLeft: WINDOW, tail: lastRowOf(shownRef.current) };
+    anchor.current = topRow(el);
+    const older = items.slice(Math.max(0, hiddenBefore - WINDOW), hiddenBefore);
+    if (older.length === 0) return;
+    frozen.current = { items: older.concat(cur.items), appendLeft: cur.appendLeft, tail: cur.tail };
+    pinnedRef.current = false;
+    setPinned(false);
+    bump((n) => n + 1);
   };
 
   return (
     <div ref={ref} className={`feed${tab === 'gift' ? ' gifts-only' : ''}`} onScroll={onScroll}>
       <div className="feed-inner">
-        {visible.length === 0 ? <div className="empty">{empty}</div> : null}
-        {visible.map((r) => {
+        {items.length === 0 ? <div className="empty">{empty}</div> : null}
+        {hiddenBefore > 0 ? (
+          <button className="btn more" onClick={showEarlier}>
+            ↑ さらに前の {num(Math.min(WINDOW, hiddenBefore))} 件を表示(残り {num(hiddenBefore)} 件)
+          </button>
+        ) : null}
+        {shown.map((r) => {
+          if (r.k === 'room') {
+            return (
+              <div key={r.id} className="room-sep" data-id={r.id}>
+                <span>
+                  新しい配信 · {dateRange(r.tsMs, r.tsMs)}
+                  {r.hostNickname ? ` · ${r.hostNickname}` : ''}
+                </span>
+              </div>
+            );
+          }
           const m = memos.get(r.viewer.userId);
           return <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={m?.note} kana={m?.kana || undefined} onTap={onTapRow} />;
         })}
       </div>
       {!pinned && unseen > 0 ? (
         <button className="newer" onClick={jump}>
-          ↓ 新着 {unseen} 件
+          ↓ 新着 {num(unseen)} 件
         </button>
       ) : null}
     </div>

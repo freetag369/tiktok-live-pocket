@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveSession } from '../src/lib/session';
-import { createFeedState } from '../src/lib/feed';
+import { LiveSession, type ScreenStore } from '../src/lib/session';
+import { createFeedState, type ScreenItem, type ScreenMeta } from '../src/lib/feed';
 import { rankLikes } from '../src/lib/likes';
 import { DEFAULT_SETTINGS } from '../src/lib/settings';
 
@@ -30,14 +30,14 @@ describe('demo session', () => {
     expect(session.rows).toHaveLength(1);
     const knownViewers = session.snapshot().knownViewers;
     session.playDemo(demo);
-    expect(session.snapshot().feed).toEqual(createFeedState());
+    expect(session.snapshot().feed).toEqual({ ...createFeedState(), roomId: expect.stringMatching(/^demo-/) });
     expect(session.snapshot().knownViewers).toBe(knownViewers);
   });
 
   it('完了後に再デモしても4行・1717ダイヤで、連打は同じ行を更新する', () => {
     for (let run = 0; run < 2; run++) {
       session.playDemo(demo);
-      expect(session.snapshot().feed).toEqual(createFeedState());
+      expect(session.snapshot().feed).toEqual({ ...createFeedState(), roomId: expect.stringMatching(/^demo-/) });
       vi.advanceTimersByTime(4000);
       for (const [count, delay] of [[1, 350], [3, 350], [5, 350], [8, 0]]) {
         const gifts = session.rows.filter((row) => row.k === 'gift');
@@ -127,7 +127,7 @@ describe('demo session', () => {
     vi.advanceTimersByTime(4700);
     expect(session.snapshot().feed.diamonds).toBe(5);
     session.playDemo(demo);
-    expect(session.snapshot().feed).toEqual(createFeedState());
+    expect(session.snapshot().feed).toEqual({ ...createFeedState(), roomId: expect.stringMatching(/^demo-/) });
     vi.advanceTimersByTime(15000);
     expect(session.snapshot().feed).toMatchObject({ giftCount: 4, diamonds: 1717 });
     expect(session.rows.filter((row) => row.k === 'gift')).toHaveLength(4);
@@ -147,14 +147,149 @@ describe('demo session', () => {
     ]);
   });
 
-  it('clearFeed は行だけ消し、いいね集計は残す', () => {
+  it('🧹(resetScreen)は行だけ消し、いいね集計は残す', () => {
     session.ingest('WebcastChatMessage', { common: { msgId: 'c1' }, user: { id: 'v1' }, content: 'hi' });
     session.ingest('WebcastLikeMessage', { common: { msgId: 'l1' }, user: { id: 'v1' }, count: 4, total: '10' });
     session.ingest('WebcastLikeMessage', { common: { msgId: 'l2' }, user: { id: 'v1' }, count: 2, total: '12' });
-    session.clearFeed();
+    session.resetScreen();
     const f = session.snapshot().feed;
     expect(f.rows).toHaveLength(0);
     expect(f.likes.get('v1')?.taps).toBe(6);
     expect(f.likeCount).toBe(6);
+  });
+});
+
+/** 画面の履歴の保存先(メモリ版)。node のテストには IndexedDB が無いので差し替える。 */
+function memoryScreenStore(initial: { items?: ScreenItem[]; meta?: ScreenMeta | null } = {}) {
+  const state = {
+    items: new Map<string, ScreenItem>((initial.items ?? []).map((i) => [i.id, i])),
+    meta: initial.meta ?? null,
+    replaced: 0,
+  };
+  const store: ScreenStore = {
+    async load() {
+      return { items: [...state.items.values()], meta: state.meta };
+    },
+    async save(items, meta) {
+      for (const it of items) {
+        const prev = state.items.get(it.id);
+        state.items.set(it.id, prev ? { ...it, seq: prev.seq } : it);
+      }
+      if (meta) state.meta = meta;
+    },
+    async replace(items, meta) {
+      state.replaced++;
+      state.items = new Map(items.map((i) => [i.id, i]));
+      if (meta) state.meta = meta;
+    },
+    async remove(ids) {
+      for (const id of ids) state.items.delete(id);
+    },
+  };
+  return { store, state };
+}
+
+const chat = (id: string, text = 'x'): [string, unknown] => ['WebcastChatMessage', { common: { msgId: id }, user: { id: `u-${id}`, nickname: 'N' }, content: text }];
+
+describe('画面の履歴', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  const newSession = (store: ScreenStore) => new LiveSession(() => ({ ...DEFAULT_SETTINGS }), { screenStore: store });
+
+  it('受信した行を積み、🧹 でストアごと空にする(集計は残る)', async () => {
+    const { store, state } = memoryScreenStore();
+    const session = newSession(store);
+    await session.whenReady();
+    session.ingest('roomInfo', { id_str: 'room-1' });
+    session.ingest(...chat('c1'));
+    session.ingest(...chat('c2'));
+    await session.listArchive(); // 保存待ちを書き切る
+
+    expect([...state.items.keys()].sort()).toEqual(['c1', 'c2']);
+    expect(state.meta).toMatchObject({ roomId: 'room-1', commentCount: 2 });
+
+    session.resetScreen();
+    await session.listArchive();
+    expect(session.rows).toHaveLength(0);
+    expect(state.items.size).toBe(0);
+    expect(state.replaced).toBe(1);
+    // タブの数と 💎 は「この配信の合計」なので残る
+    expect(session.snapshot().feed).toMatchObject({ commentCount: 2, roomId: 'room-1' });
+
+    // リセットのあとに届いた行はちゃんと残る
+    session.ingest(...chat('c3'));
+    await session.listArchive();
+    expect([...state.items.keys()]).toEqual(['c3']);
+  });
+
+  it('次に開いたとき同じ並びで戻り、同じ配信なら区切りなしで続く', async () => {
+    const items: ScreenItem[] = [{ k: 'comment', id: 'c1', tsMs: 1000, viewer: { userId: 'a' }, text: 'まえの', visits: 1, firstEver: false, roomId: 'room-1', seq: 1 }];
+    const meta: ScreenMeta = { roomId: 'room-1', commentCount: 7, joinCount: 2, giftCount: 1, diamonds: 30, seen: ['c1'], streaks: [] };
+    const session = newSession(memoryScreenStore({ items, meta }).store);
+    await session.whenReady();
+
+    expect(session.rows.map((r) => r.id)).toEqual(['c1']);
+    expect(session.snapshot().feed).toMatchObject({ roomId: 'room-1', commentCount: 7, diamonds: 30 });
+
+    // 同じ配信につなぎ直す: 区切りは入らず、集計は続きから
+    session.ingest('roomInfo', { id_str: 'room-1' });
+    session.ingest(...chat('c2'));
+    expect(session.snapshot().feed.rows.some((r) => r.k === 'room')).toBe(false);
+    expect(session.snapshot().feed.commentCount).toBe(8);
+
+    // 別の配信: 区切りが入り、集計はリセット。行は残る
+    session.ingest('roomInfo', { id_str: 'room-2' });
+    session.ingest(...chat('c3'));
+    expect(session.snapshot().feed.rows.filter((r) => r.k === 'room')).toHaveLength(1);
+    expect(session.snapshot().feed.commentCount).toBe(1);
+    expect(session.rows.map((r) => r.id)).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  it('読込前に届いた行は、復元した行を消さずに後ろへ続く', async () => {
+    const items: ScreenItem[] = [{ k: 'comment', id: 'old', tsMs: 1000, viewer: { userId: 'a' }, text: 'ふるい', visits: 1, firstEver: false, roomId: 'room-1', seq: 1 }];
+    const session = newSession(memoryScreenStore({ items }).store);
+    session.ingest('roomInfo', { id_str: 'room-9' });
+    session.ingest(...chat('live1'));
+    await session.whenReady();
+    // 復元 → 溜めていた分、の順で並ぶ。別配信なので境目に区切りが入る。
+    expect(session.rows.map((r) => r.id)).toEqual(['old', 'live1']);
+    expect(session.snapshot().feed.rows.filter((r) => r.k === 'room')).toHaveLength(1);
+    expect(session.roomInfo.roomId).toBe('room-9');
+  });
+
+  it('デモは本物の画面を退避して流し、止めると戻る。デモ中の 🧹 はストアを触らない', async () => {
+    const { store, state } = memoryScreenStore();
+    const session = newSession(store);
+    await session.whenReady();
+    session.ingest('roomInfo', { id_str: 'room-1' });
+    session.ingest(...chat('real1'));
+    await session.listArchive();
+    expect(state.items.size).toBe(1);
+
+    session.playDemo(demo);
+    expect(session.rows).toHaveLength(0);
+    vi.advanceTimersByTime(30_000); // デモが自然に終わる(demo フラグは下りるが画面はデモのまま)
+    expect(session.snapshot().demo).toBe(false);
+    expect(session.rows.length).toBeGreaterThan(0);
+
+    session.resetScreen();
+    await session.listArchive();
+    expect(state.replaced).toBe(0);
+    expect([...state.items.keys()]).toEqual(['real1']);
+
+    session.disconnect(); // デモを止めると本物の画面に戻る
+    expect(session.rows.map((r) => r.id)).toEqual(['real1']);
+
+    // 自然終了のあとに再デモしても本物は失わない
+    session.playDemo(demo);
+    vi.advanceTimersByTime(30_000);
+    session.playDemo(demo);
+    session.disconnect();
+    expect(session.rows.map((r) => r.id)).toEqual(['real1']);
+    expect([...state.items.keys()]).toEqual(['real1']);
   });
 });

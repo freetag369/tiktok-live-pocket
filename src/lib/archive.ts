@@ -5,7 +5,7 @@ import { stamp } from './format';
 /**
  * アーカイブ(配信ごとの全行)の純粋ロジック。IndexedDB への読み書きは db.ts。
  *
- *  - 行は FeedRow に roomId を付けてそのまま保存する(画面の 500 行上限とは無関係に全件)。
+ *  - 行は FeedRow に roomId を付けてそのまま保存する(画面の履歴や 🧹 とは無関係に全件)。
  *  - 配信(StreamRecord)は行を保存するたびに集計を更新する。同じ id の行を再保存しても
  *    二重に数えない(prev を見て差分だけ足す)ので、再接続・再起動・バックアップ取り込みに強い。
  */
@@ -127,6 +127,7 @@ export function sanitizeArchivedRow(raw: unknown): ArchivedRow | null {
         streaking: false,
       };
       if (typeof r.iconUrl === 'string' && /^https?:\/\//.test(r.iconUrl)) out.iconUrl = r.iconUrl;
+      if (typeof r.groupId === 'string' && r.groupId) out.groupId = r.groupId;
       return out;
     }
     default:
