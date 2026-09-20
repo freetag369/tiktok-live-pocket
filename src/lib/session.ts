@@ -1,10 +1,10 @@
 import type { NormalizedEvent, Viewer } from './events';
 import { viewerOf } from './events';
-import { applyEvent, createFeedState, resetForNewRoom, type FeedState } from './feed';
+import { applyEvent, clearRows, createFeedState, dataRows, enterRoom, restoreFeed, toScreenMeta, type FeedItem, type FeedState, type ScreenItem, type ScreenMeta } from './feed';
 import { GiftCatalog } from './gift-catalog';
 import { normalize } from './normalize';
 import { VisitCounter } from './visits';
-import { loadGiftCatalog, loadVisits, saveGiftCatalog, saveVisits, clearVisits, replaceVisits, loadMemos, saveMemos, replaceMemos, saveArchiveRows, listStreams, loadStreamRows, deleteStream, clearArchive, loadAllArchive, type GiftCatalogRecord } from './db';
+import { loadGiftCatalog, loadVisits, saveGiftCatalog, saveVisits, clearVisits, replaceVisits, loadMemos, saveMemos, replaceMemos, saveArchiveRows, listStreams, loadStreamRows, deleteStream, clearArchive, loadAllArchive, loadScreen, saveScreen, replaceScreen, deleteScreenRows, type GiftCatalogRecord } from './db';
 import { streamsToPrune, type StreamRecord } from './archive';
 import type { ArchiveBackup } from './backup';
 import type { FeedRow } from './feed';
@@ -37,6 +37,8 @@ export interface SessionSnapshot {
   knownViewers: number;
   /** リスナーメモ(userId → メモ)。行の描画時に引く。中身が変わったときだけ参照が変わる。 */
   memos: ReadonlyMap<string, MemoRecord>;
+  /** 画面をまるごと入れ替えた回数(🧹・復元・デモの出入り)。FeedList の作り直しに使う。 */
+  screenEpoch: number;
 }
 
 /** リスナー一覧の 1 行(来店履歴 + メモ)。 */
@@ -64,8 +66,23 @@ type FollowListener = (n: FollowNotice) => void;
 /** これより古いフォローは通知しない(接続直後のバックログ再送対策)。 */
 export const FOLLOW_NOTICE_MAX_AGE_MS = 60_000;
 
+/** 画面の履歴の保存先。既定は IndexedDB(テストではメモリの偽物を渡す)。 */
+export interface ScreenStore {
+  load(): Promise<{ items: ScreenItem[]; meta: ScreenMeta | null }>;
+  save(items: ScreenItem[], meta: ScreenMeta | null): Promise<void>;
+  replace(items: ScreenItem[], meta: ScreenMeta | null): Promise<void>;
+  remove(ids: string[]): Promise<void>;
+}
+
+const indexedDbScreenStore: ScreenStore = { load: loadScreen, save: saveScreen, replace: replaceScreen, remove: deleteScreenRows };
+
+/** 復元(IndexedDB)が遅くても、これを過ぎたら受信を画面に流す。 */
+export const RESTORE_TIMEOUT_MS = 3000;
+
 export class LiveSession {
   private feed: FeedState = createFeedState();
+  /** デモ再生中に退避した本物の画面。null でなければ「デモの画面を出している」。 */
+  private parkedFeed: FeedState | null = null;
   private socketState: SocketState = { s: 'idle' };
   private room: RoomState = { roomId: '' };
   /** いまの部屋が roomInfo で確定したものなら true(common.roomId では上書きしない)。 */
@@ -89,10 +106,20 @@ export class LiveSession {
   private getSettings: () => Settings;
   /** アーカイブ保存待ちの行(id → 行)。1 秒ごとに IndexedDB へ。 */
   private archiveDirty = new Map<string, { roomId: string; row: FeedRow }>();
+  /** 画面の履歴の保存待ち(id → 行 or 配信の区切り)。 */
+  private screenDirty = new Map<string, ScreenItem>();
+  private metaDirty = false;
+  private screen: ScreenStore;
+  /** 保存の順番を守るための列(リセットの消去と書き込みが前後しないように)。 */
+  private chain: Promise<void> = Promise.resolve();
+  /** 保存の並び順。時刻ベースで単調増加させる。 */
+  private lastSeq = 0;
+  private screenEpoch = 0;
 
-  constructor(getSettings: () => Settings) {
+  constructor(getSettings: () => Settings, o: { screenStore?: ScreenStore } = {}) {
     this.getSettings = getSettings;
-    this.ready = this.load();
+    this.screen = o.screenStore ?? indexedDbScreenStore;
+    this.ready = this.load().catch(() => {});
     this.flushTimer = setInterval(() => void this.persist(), 1000);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
@@ -104,19 +131,44 @@ export class LiveSession {
   }
 
   private async load(): Promise<void> {
+    // IndexedDB が固まっても受信が止まらないよう、一定時間で待つのをやめる。
+    const timer = setTimeout(() => this.releasePending(), RESTORE_TIMEOUT_MS);
     try {
       const [v, g, m] = await Promise.all([loadVisits(), loadGiftCatalog(), loadMemos()]);
       this.visits = new VisitCounter(v);
       this.catalog = new GiftCatalog(g);
       this.memos = new MemoBook(m);
+      const { items, meta } = await this.screen.load();
+      // タイムアウトで受信を流した後に届いた復元は捨てる(ストアは残るので次の起動で戻る)。
+      if (this.pending) this.applyRestored(items, meta);
     } finally {
+      clearTimeout(timer);
       // 読込前に数えると保存済みの人まで「初見」になるので、溜めておいた分をここで流す。
-      const queued = this.pending ?? [];
-      this.pending = null;
-      for (const [type, data, now] of queued) this.ingest(type, data, now);
+      this.releasePending();
       this.notify();
     }
     await this.pruneArchive();
+  }
+
+  /** 保存してあった画面の履歴を、まだ何も出ていない画面にだけ戻す。 */
+  private applyRestored(items: ScreenItem[], meta: ScreenMeta | null): void {
+    if (items.length === 0 && !meta) return;
+    for (const it of items) if (it.seq > this.lastSeq) this.lastSeq = it.seq;
+    const target = this.parkedFeed ?? this.feed;
+    if (target.rows.length > 0 || target.roomId) return;
+    const { state, dropIds } = restoreFeed(items, meta);
+    if (this.parkedFeed) this.parkedFeed = state;
+    else this.feed = state;
+    this.screenEpoch++;
+    if (dropIds.length) void this.queue(() => this.screen.remove(dropIds));
+  }
+
+  /** 読込・復元を待って貯めていたメッセージを、受信したときの時刻のまま流す。 */
+  private releasePending(): void {
+    const queued = this.pending;
+    if (!queued) return;
+    this.pending = null;
+    for (const [type, data, now] of queued) this.ingest(type, data, now);
   }
 
   whenReady(): Promise<void> {
@@ -140,7 +192,15 @@ export class LiveSession {
   }
 
   snapshot(): SessionSnapshot {
-    return { feed: this.feed, socket: this.socketState, room: this.room, demo: this.demoStop != null, knownViewers: this.visits.size, memos: (this.demoMemos ?? this.memos).view() };
+    return {
+      feed: this.feed,
+      socket: this.socketState,
+      room: this.room,
+      demo: this.demoStop != null,
+      knownViewers: this.visits.size,
+      memos: (this.demoMemos ?? this.memos).view(),
+      screenEpoch: this.screenEpoch,
+    };
   }
 
   private notify(): void {
@@ -161,24 +221,38 @@ export class LiveSession {
     setTimeout(run, hidden ? 50 : 100);
   }
 
+  /** 保存はこの列で順に流す。失敗しても列は止めない。 */
+  private queue(step: () => Promise<void>): Promise<void> {
+    const run = this.chain.then(step).catch(() => {});
+    this.chain = run;
+    return run;
+  }
+
   private async persist(): Promise<void> {
+    // 呼ばれた時点の分をその場で取り出してから列に並べる(リセットとの前後が入れ替わらない)。
     const v = this.visits.drainDirty();
     const g = this.catalog.drainDirty();
     const m = this.memos.drainDirty();
-    if (v.length) await saveVisits(v);
-    if (g.length) await saveGiftCatalog(g);
-    if (m.put.length || m.del.length) await saveMemos(m.put, m.del);
-    if (this.archiveDirty.size) {
-      const byRoom = new Map<string, FeedRow[]>();
-      for (const { roomId, row } of this.archiveDirty.values()) {
-        let list = byRoom.get(roomId);
-        if (!list) byRoom.set(roomId, (list = []));
-        list.push(row);
-      }
-      this.archiveDirty.clear();
-      const host = { hostUniqueId: this.room.hostUniqueId, hostNickname: this.room.hostNickname };
-      for (const [roomId, rows] of byRoom) await saveArchiveRows(roomId, rows, host);
+    const host = { hostUniqueId: this.room.hostUniqueId, hostNickname: this.room.hostNickname };
+    const archive = new Map<string, FeedRow[]>();
+    for (const { roomId, row } of this.archiveDirty.values()) {
+      let list = archive.get(roomId);
+      if (!list) archive.set(roomId, (list = []));
+      list.push(row);
     }
+    this.archiveDirty.clear();
+    const screen = [...this.screenDirty.values()];
+    this.screenDirty.clear();
+    const meta = this.metaDirty && !this.parkedFeed ? toScreenMeta(this.feed) : null;
+    this.metaDirty = false;
+    if (!v.length && !g.length && !m.put.length && !m.del.length && archive.size === 0 && screen.length === 0 && !meta) return this.chain;
+    return this.queue(async () => {
+      if (v.length) await saveVisits(v);
+      if (g.length) await saveGiftCatalog(g);
+      if (m.put.length || m.del.length) await saveMemos(m.put, m.del);
+      for (const [roomId, rows] of archive) await saveArchiveRows(roomId, rows, host);
+      if (screen.length || meta) await this.screen.save(screen, meta);
+    });
   }
 
   /** 設定の保持数を超えた古い配信を消す(受信中の部屋は残す)。 */
@@ -241,7 +315,7 @@ export class LiveSession {
     switch (e.kind) {
       case 'roomInfo': {
         if (e.roomId !== this.room.roomId) {
-          this.switchRoom(e.roomId, e.hostNickname, e.hostUniqueId);
+          this.switchRoom(e.roomId, now, e.hostNickname, e.hostUniqueId);
         } else {
           this.room = { ...this.room, hostNickname: e.hostNickname ?? this.room.hostNickname, hostUniqueId: e.hostUniqueId ?? this.room.hostUniqueId };
         }
@@ -266,7 +340,7 @@ export class LiveSession {
     // roomInfo が来ない・読めないと来店を数えられず全員「初見」になる。common.roomId で部屋を補う。
     // roomInfo で確定した部屋は上書きしない。
     if (e.roomId && e.roomId !== this.room.roomId && !this.roomFromInfo) {
-      this.switchRoom(e.roomId);
+      this.switchRoom(e.roomId, now);
       this.notify();
     }
 
@@ -276,11 +350,13 @@ export class LiveSession {
     if (e.kind === 'gift') this.catalog.observe(e, now);
     const next = applyEvent(this.feed, e, meta, e.kind === 'gift' ? this.catalog.iconOf(e.giftId) : undefined, now);
     if (next !== this.feed) {
-      // デモは本物のアーカイブに残さない。roomInfo 前の行(部屋が不明)も残さない。
-      if (next.lastTouched && this.room.roomId && !this.demoVisits && this.getSettings().archiveEnabled) {
-        this.archiveDirty.set(next.lastTouched.id, { roomId: this.room.roomId, row: next.lastTouched });
+      // デモは本物のアーカイブ・画面の履歴に残さない。roomInfo 前の行(部屋が不明)も残さない。
+      if (next.lastTouched && this.room.roomId && !this.parkedFeed) {
+        if (this.getSettings().archiveEnabled) this.archiveDirty.set(next.lastTouched.id, { roomId: this.room.roomId, row: next.lastTouched });
+        this.rememberScreen(next.lastTouched, this.room.roomId);
       }
       this.feed = next;
+      this.metaDirty = true;
       this.notify();
       // デモは fixture の createTime が固定値なので鮮度は見ない。
       if (e.kind === 'social' && e.sub === 'follow' && (this.demoStop != null || now - e.tsMs <= FOLLOW_NOTICE_MAX_AGE_MS)) {
@@ -290,23 +366,46 @@ export class LiveSession {
     }
   }
 
-  private switchRoom(roomId: string, hostNickname?: string, hostUniqueId?: string): void {
-    if (this.room.roomId) this.feed = resetForNewRoom(this.feed);
+  /**
+   * 配信が変わった。画面の行は残したまま、境目に区切りを入れて集計をやり直す。
+   * roomInfo で確定した部屋は common.roomId では上書きしない(roomFromInfo)。
+   */
+  private switchRoom(roomId: string, now: number, hostNickname?: string, hostUniqueId?: string): void {
+    const next = enterRoom(this.feed, roomId, { hostNickname, now });
+    if (next !== this.feed) {
+      const mark = next.rows[next.rows.length - 1];
+      if (mark && mark.k === 'room' && mark !== this.feed.rows[this.feed.rows.length - 1]) this.rememberScreen(mark, roomId);
+      this.feed = next;
+      this.metaDirty = true;
+    }
     this.room = { roomId, hostNickname, hostUniqueId };
     this.roomFromInfo = false;
     (this.demoVisits ?? this.visits).setRoom(roomId);
-    if (!this.demoVisits) void this.persist().then(() => this.pruneArchive());
+    if (!this.parkedFeed) void this.persist().then(() => this.pruneArchive());
   }
 
-  // ── デモ再生(ネット不要)─────────────────────────────────────────
+  /** 画面の履歴に 1 件積む(連打の更新で呼び直しても、保存側が並び順を引き継ぐ)。 */
+  private rememberScreen(item: FeedItem, roomId: string): void {
+    if (this.parkedFeed) return;
+    this.screenDirty.set(item.id, { ...item, roomId, seq: this.nextSeq() } as ScreenItem);
+  }
+
+  private nextSeq(): number {
+    this.lastSeq = Math.max(this.lastSeq + 1, Date.now() * 1000);
+    return this.lastSeq;
+  }
+
+  // ── デモ再生(ネット不要) ─────────────────────────────────────────
 
   /** 既存 fixtures 形式(`{o, type, data}` の ndjson)を時間どおりに流す。 */
   playDemo(lines: Array<{ o: number; type?: string; data?: unknown }>, speed = 1): void {
     this.socket?.stop();
     this.socket = null;
     this.stopDemo();
-    // デモは毎回同じ msgId を使うため、前の行と連打・重複排除の状態をまとめて初期化する。
+    // 本物の画面は退避し、デモは空の画面で流す(デモで本物の履歴が消えない)。
+    this.parkedFeed ??= this.feed;
     this.feed = createFeedState();
+    this.screenEpoch++;
     const roomId = `demo-${Date.now()}`;
     // 見本として「常連」「2回目」「初見」が混ざるように種を入れる(保存はしない)。
     const t0 = Date.now() - 7 * 24 * 3600 * 1000;
@@ -352,7 +451,10 @@ export class LiveSession {
       // デモの部屋を本物の来店カウンタに残さない。次の roomInfo で切り替わる。
       this.room = { roomId: '' };
       this.roomFromInfo = false;
-      this.feed = resetForNewRoom(this.feed);
+      // 退避しておいた本物の画面に戻す。
+      this.feed = this.parkedFeed ?? createFeedState();
+      this.parkedFeed = null;
+      this.screenEpoch++;
     }
   }
 
@@ -474,17 +576,33 @@ export class LiveSession {
     await clearArchive();
   }
 
-  /** いま画面にある行(書き出し用)。 */
-  get rows() {
-    return this.feed.rows;
+  // ── 画面の履歴 ───────────────────────────────────────────────────
+
+  /** いま画面にある行(書き出し用。配信の区切りは含まない)。 */
+  get rows(): FeedRow[] {
+    return dataRows(this.feed.rows);
   }
 
   get roomInfo(): RoomState {
     return this.room;
   }
 
-  clearFeed(): void {
-    this.feed = { ...createFeedState(), seen: this.feed.seen, seenOrder: this.feed.seenOrder, streaks: this.feed.streaks, lastJoin: this.feed.lastJoin, diamonds: this.feed.diamonds, giftCount: this.feed.giftCount, commentCount: this.feed.commentCount, joinCount: this.feed.joinCount, likes: this.feed.likes, likeCount: this.feed.likeCount, likeRoomTotal: this.feed.likeRoomTotal };
+  /**
+   * 🧹 画面の行を消す。🗂 アーカイブ・💎・タブの数(この配信の集計)は残す。
+   * 連打の途中のギフト行だけは残して、続きの ×N が迷子にならないようにする。
+   */
+  resetScreen(): void {
+    this.feed = clearRows(this.feed);
+    this.screenEpoch++;
+    // デモの画面を消しているときは、退避中の本物の履歴とストアには触らない。
+    if (!this.parkedFeed) {
+      this.screenDirty.clear();
+      const roomId = this.room.roomId || this.feed.roomId;
+      const items = this.feed.rows.map((r) => ({ ...r, roomId: r.k === 'room' ? r.roomId : roomId, seq: this.nextSeq() }) as ScreenItem);
+      const meta = toScreenMeta(this.feed);
+      this.metaDirty = false;
+      void this.queue(() => this.screen.replace(items, meta));
+    }
     this.notify();
   }
 }

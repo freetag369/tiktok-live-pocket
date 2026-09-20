@@ -6,7 +6,7 @@ import { LikeToasts } from './components/LikeToasts';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
-import type { FeedRow } from './lib/feed';
+import { countDataRows, type FeedRow } from './lib/feed';
 import { FollowToast } from './components/FollowToast';
 import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
 import { ArchiveSheet } from './components/Archive';
@@ -35,6 +35,7 @@ export function App() {
   const [showViewers, setShowViewers] = useState(false);
   const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
   const [showArchive, setShowArchive] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => session.subscribe(setSnap), [session]);
 
@@ -52,6 +53,14 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.fs = settings.fontSize;
   }, [settings.fontSize]);
+
+  // 確認バナーはタブを切り替えるか 10 秒で引っ込める(押しっぱなしにしない)。
+  useEffect(() => {
+    if (!confirmClear) return;
+    const t = setTimeout(() => setConfirmClear(false), 10_000);
+    return () => clearTimeout(t);
+  }, [confirmClear, tab]);
+  useEffect(() => setConfirmClear(false), [tab]);
 
   useEffect(() => {
     installWakeLockRefresh();
@@ -92,6 +101,7 @@ export function App() {
   const viewerItems = useMemo(() => (showViewers ? session.viewersForList() : []), [showViewers, session, snap.memos, snap.knownViewers]);
 
   const f = snap.feed;
+  const hasRows = f.rows.some((r) => r.k !== 'room');
   const tabs: Array<[ScreenTab, string, number | null]> = [
     ['all', 'すべて', null],
     ['comment', 'コメント', f.commentCount],
@@ -138,7 +148,24 @@ export function App() {
             {n != null && n > 0 ? <span className="n">{compact(n)}</span> : null}
           </button>
         ))}
+        <button className="tab-reset" aria-label="画面の履歴をリセット" disabled={!hasRows} onClick={() => setConfirmClear((c) => !c)}>
+          🧹
+        </button>
       </nav>
+      {confirmClear ? (
+        <div className="banner warn">
+          <span>画面の行を消しますか?(🗂 と 💎 は残ります)</span>
+          <button
+            onClick={() => {
+              session.resetScreen();
+              setConfirmClear(false);
+            }}
+          >
+            消す
+          </button>
+          <button onClick={() => setConfirmClear(false)}>やめる</button>
+        </div>
+      ) : null}
       {tab === 'like' ? (
         <LikeRanking
           likes={f.likes}
@@ -150,6 +177,7 @@ export function App() {
       ) : (
         <div className="feed-wrap">
           <FeedList
+            key={`${tab}:${snap.screenEpoch}`}
             rows={f.rows}
             tab={tab}
             showAvatars={settings.showAvatars}
@@ -183,7 +211,7 @@ export function App() {
           memoCount={session.memoCount}
           connected={connected}
           session={session}
-          rowCount={f.rows.length}
+          rowCount={countDataRows(f.rows)}
         />
       ) : null}
       {showViewers ? (
