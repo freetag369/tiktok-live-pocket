@@ -2,6 +2,7 @@ import type { GiftEvent, NormalizedEvent, Viewer } from './events';
 
 /** 画面に並ぶ 1 行。UI はこれだけを描く。 */
 export type FeedRow =
+  | { k: 'like'; id: string; tsMs: number; viewer: Viewer; count: number; visits: number; firstEver: boolean }
   | {
       k: 'comment';
       id: string;
@@ -51,7 +52,7 @@ export interface FeedState {
   seen: Set<string>;
   seenOrder: string[];
   /** 連打の進行中行: streakKey → { rowId, counted } */
-  streaks: Map<string, { rowId: string; counted: number }>;
+  streaks: Map<string, { rowId: string; counted: number; row?: Extract<FeedRow, { k: 'gift' }> }>;
   /** 直近の入室時刻: userId → tsMs(MemberMessage と Barrage の両方が届いたときの二重表示防止)。 */
   lastJoin: Map<string, number>;
   /** この配信の累計💎(tick ごとの差分で積むので、最後の repeatEnd が欠けても正しい)。 */
@@ -116,6 +117,10 @@ function streakKey(e: GiftEvent): string {
  */
 export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, iconFallback?: string): FeedState {
   switch (e.kind) {
+    case 'like': {
+      if (e.count <= 0 || !remember(s, e.msgId)) return s;
+      return { ...s, lastTouched: { k: 'like', id: e.msgId, tsMs: e.tsMs, viewer: e.viewer, count: e.count, ...meta } };
+    }
     case 'comment': {
       if (!remember(s, e.msgId)) return s;
       const row: FeedRow = {
@@ -181,10 +186,10 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         const rows = s.rows.slice();
         const idx = rows.findIndex((r) => r.id === cur.rowId);
         let touched: FeedRow | null = null;
-        if (idx >= 0) {
-          const old = rows[idx] as Extract<FeedRow, { k: 'gift' }>;
+        const old = idx >= 0 ? rows[idx] as Extract<FeedRow, { k: 'gift' }> : cur.row;
+        if (old) {
           const count = Math.max(old.count, e.repeatCount);
-          rows[idx] = {
+          touched = {
             ...old,
             count,
             diamonds: count * old.diamondEach,
@@ -192,10 +197,10 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
             iconUrl: old.iconUrl || iconUrl,
             tsMs: e.tsMs,
           };
-          touched = rows[idx]!;
+          if (idx >= 0) rows[idx] = touched;
         }
         const streaks = new Map(s.streaks);
-        if (e.streaking) streaks.set(key, { rowId: cur.rowId, counted: Math.max(cur.counted, e.repeatCount) });
+        if (e.streaking) streaks.set(key, { rowId: cur.rowId, counted: Math.max(cur.counted, e.repeatCount), row: touched?.k === 'gift' ? touched : cur.row });
         else streaks.delete(key);
         return { ...s, rows, streaks, diamonds: s.diamonds + delta * e.diamondEach, lastTouched: touched };
       }
@@ -216,7 +221,7 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         firstEver: meta.firstEver,
       };
       const streaks = new Map(s.streaks);
-      if (e.streaking) streaks.set(key, { rowId: row.id, counted: e.repeatCount });
+      if (e.streaking) streaks.set(key, { rowId: row.id, counted: e.repeatCount, row });
       return {
         ...s,
         rows: push(s, row),

@@ -17,21 +17,21 @@ interface PocketDB extends DBSchema {
   gifts: { key: string; value: GiftCatalogRecord };
   memos: { key: string; value: MemoRecord };
   /** アーカイブの行(全配信)。byRoomTs で配信ごとに時刻順に引ける。 */
-  logRows: { key: string; value: ArchivedRow; indexes: { byRoomTs: [string, number] } };
+  logRows: { key: string; value: ArchivedRow; indexes: { byRoomTs: [string, number]; byTs: number } };
   /** 配信ごとの集計(一覧用)。 */
   streams: { key: string; value: StreamRecord };
 }
 
 const DB_NAME = 'tiktok-live-pocket';
-/** v2: memos(リスナーメモ)、v3: logRows / streams(アーカイブ)を追加。 */
-const DB_VERSION = 3;
+/** v2: memos、v3: アーカイブ、v4: 日付検索用インデックス。 */
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<PocketDB>> | null = null;
 
 export function getDb(): Promise<IDBPDatabase<PocketDB>> {
   if (!dbPromise) {
     dbPromise = openDB<PocketDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, _old, _next, tx) {
         if (!db.objectStoreNames.contains('visits')) db.createObjectStore('visits', { keyPath: 'userId' });
         if (!db.objectStoreNames.contains('gifts')) db.createObjectStore('gifts', { keyPath: 'giftId' });
         if (!db.objectStoreNames.contains('memos')) db.createObjectStore('memos', { keyPath: 'userId' });
@@ -40,10 +40,17 @@ export function getDb(): Promise<IDBPDatabase<PocketDB>> {
           rows.createIndex('byRoomTs', ['roomId', 'tsMs']);
         }
         if (!db.objectStoreNames.contains('streams')) db.createObjectStore('streams', { keyPath: 'roomId' });
+        const rows = tx.objectStore('logRows');
+        if (!rows.indexNames.contains('byTs')) rows.createIndex('byTs', 'tsMs');
       },
     });
   }
   return dbPromise;
+}
+
+export async function loadDayRows(startMs: number, endMs: number): Promise<ArchivedRow[]> {
+  const db = await getDb();
+  return db.getAllFromIndex('logRows', 'byTs', IDBKeyRange.bound(startMs, endMs, false, true));
 }
 
 export async function loadVisits(): Promise<VisitRecord[]> {

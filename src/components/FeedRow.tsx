@@ -26,6 +26,11 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
   const memoEl = note ? <div className="memo-line">📝 {note}</div> : null;
 
   switch (row.k) {
+    case 'like':
+      return <div className={`row social${extra}`} onClick={click}>
+        <Avatar url={v.avatarUrl} name={name} enabled={showAvatars} />
+        <div className="body"><div className="head"><span className="who">{name}</span>{kanaEl}<span>いいね ×{num(row.count)}</span><span className="time">{hhmm(row.tsMs)}</span></div>{memoEl}</div>
+      </div>;
     case 'comment':
       return (
         <div className={`row comment${extra}`} onClick={click}>

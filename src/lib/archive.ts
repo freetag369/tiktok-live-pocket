@@ -107,6 +107,10 @@ export function sanitizeArchivedRow(raw: unknown): ArchivedRow | null {
   const firstEver = Boolean(r.firstEver);
   const common = { id: r.id, roomId: r.roomId, tsMs, viewer, visits, firstEver };
   switch (r.k) {
+    case 'like': {
+      const count = Number(r.count);
+      return Number.isFinite(count) && count > 0 ? { k: 'like', ...common, count: Math.floor(count) } : null;
+    }
     case 'comment':
       return { k: 'comment', ...common, text: typeof r.text === 'string' ? r.text : '' };
     case 'join':

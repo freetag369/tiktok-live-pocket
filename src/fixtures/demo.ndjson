@@ -26,3 +26,4 @@
 {"o":12700,"type":"WebcastChatMessage","data":{"common":{"msgId":"demo25","createTime":"1785240012"},"user":{"id":"1","idStr":"1","displayId":"sakura_03","nickname":"さくら🌸","avatarThumb":{"urlList":[]},"badgeList":[]},"content":"えっギャラクシー！？すごい"}}
 {"o":13300,"type":"WebcastSocialMessage","data":{"common":{"msgId":"demo26","createTime":"1785240013","displayText":{"key":"pm_mt_guidance_share"}},"user":{"id":"6","idStr":"6","displayId":"daichi88","nickname":"だいち","avatarThumb":{"urlList":[]},"badgeList":[]}}}
 {"o":14000,"type":"WebcastChatMessage","data":{"common":{"msgId":"demo27","createTime":"1785240014"},"user":{"id":"5","idStr":"5","displayId":"yuna_yy","nickname":"ゆな","avatarThumb":{"urlList":[]},"badgeList":[]},"content":"また来ます〜👋"}}
+{"o":3500,"type":"WebcastLikeMessage","data":{"common":{"msgId":"demo-like1","createTime":"1785240003"},"user":{"id":"2","displayId":"kenji_ks","nickname":"けんじ"},"likeCount":12}}

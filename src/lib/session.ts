@@ -13,6 +13,9 @@ import { MemoBook, type MemoPatch, type MemoRecord } from './memos';
 import { EulerSocket, type SocketState } from './euler-socket';
 import { buildEulerUrl } from './euler-url';
 import type { Settings } from './settings';
+import { loadDayRows } from './db';
+import type { ArchivedRow } from './archive';
+import { actionKey, dayRange, mergeDayRows } from './highlights';
 
 /**
  * 受信 → 正規化 → 来店カウント → フィード、の配線。React からは `subscribe` で購読する。
@@ -28,6 +31,7 @@ export interface RoomState {
 }
 
 export interface SessionSnapshot {
+  actionsRevision: number;
   feed: FeedState;
   socket: SocketState;
   room: RoomState;
@@ -85,6 +89,12 @@ export class LiveSession {
   private getSettings: () => Settings;
   /** アーカイブ保存待ちの行(id → 行)。1 秒ごとに IndexedDB へ。 */
   private archiveDirty = new Map<string, { roomId: string; row: FeedRow }>();
+  private actionRows = new Map<string, ArchivedRow>();
+  private demoActionRows = new Map<string, ArchivedRow>();
+  /** Gift updates use the first event's row id; remember subsequent message ids too. */
+  private giftMessages = new Map<string, string>();
+  private actionsRevision = 0;
+  private persistQueue: Promise<void> = Promise.resolve();
 
   constructor(getSettings: () => Settings) {
     this.getSettings = getSettings;
@@ -129,7 +139,7 @@ export class LiveSession {
   }
 
   snapshot(): SessionSnapshot {
-    return { feed: this.feed, socket: this.socketState, room: this.room, demo: this.demoStop != null, knownViewers: this.visits.size, memos: (this.demoMemos ?? this.memos).view() };
+    return { actionsRevision: this.actionsRevision, feed: this.feed, socket: this.socketState, room: this.room, demo: this.demoStop != null, knownViewers: this.visits.size, memos: (this.demoMemos ?? this.memos).view() };
   }
 
   private notify(): void {
@@ -150,7 +160,12 @@ export class LiveSession {
     setTimeout(run, hidden ? 50 : 100);
   }
 
-  private async persist(): Promise<void> {
+  private persist(): Promise<void> {
+    this.persistQueue = this.persistQueue.catch(() => {}).then(() => this.persistNow());
+    return this.persistQueue;
+  }
+
+  private async persistNow(): Promise<void> {
     const v = this.visits.drainDirty();
     const g = this.catalog.drainDirty();
     const m = this.memos.drainDirty();
@@ -174,7 +189,7 @@ export class LiveSession {
   private async pruneArchive(): Promise<void> {
     const keep = this.getSettings().archiveKeepStreams;
     const streams = await listStreams();
-    for (const roomId of streamsToPrune(streams, keep, this.room.roomId)) await deleteStream(roomId);
+    for (const roomId of streamsToPrune(streams, keep, this.room.roomId)) await this.deleteArchivedStream(roomId);
   }
 
   // ── 接続 ─────────────────────────────────────────────────────────────
@@ -219,6 +234,7 @@ export class LiveSession {
   ingest(type: string, data: unknown, now = Date.now()): void {
     const e = normalize(type, data, now);
     if (!e) return;
+    if (this.demoVisits) e.tsMs = now;
     this.apply(e, now);
   }
 
@@ -252,10 +268,19 @@ export class LiveSession {
 
     const v = viewerOf(e);
     if (!v) return;
+    const actionRows = this.demoVisits ? this.demoActionRows : this.actionRows;
+    const eventKey = actionKey({ roomId: this.room.roomId, id: e.msgId });
+    if (actionRows.has(eventKey) || this.giftMessages.has(eventKey)) return;
     const meta = (this.demoVisits ?? this.visits).touch(v, now);
     if (e.kind === 'gift') this.catalog.observe(e, now);
     const next = applyEvent(this.feed, e, meta, e.kind === 'gift' ? this.catalog.iconOf(e.giftId) : undefined);
     if (next !== this.feed) {
+      if (e.kind === 'gift') this.giftMessages.set(eventKey, this.room.roomId);
+      if (next.lastTouched) {
+        const row = { ...next.lastTouched, roomId: this.room.roomId };
+        actionRows.set(actionKey(row), row);
+        this.actionsRevision++;
+      }
       // デモは本物のアーカイブに残さない。roomInfo 前の行(部屋が不明)も残さない。
       if (next.lastTouched && this.room.roomId && !this.demoVisits && this.getSettings().archiveEnabled) {
         this.archiveDirty.set(next.lastTouched.id, { roomId: this.room.roomId, row: next.lastTouched });
@@ -279,6 +304,8 @@ export class LiveSession {
     this.stopDemo();
     // デモは毎回同じ msgId を使うため、前の行と連打・重複排除の状態をまとめて初期化する。
     this.feed = createFeedState();
+    this.demoActionRows.clear();
+    this.actionsRevision++;
     const roomId = `demo-${Date.now()}`;
     // 見本として「常連」「2回目」「初見」が混ざるように種を入れる(保存はしない)。
     const t0 = Date.now() - 7 * 24 * 3600 * 1000;
@@ -319,8 +346,11 @@ export class LiveSession {
       this.demoStop = null;
     }
     if (this.demoVisits) {
+      for (const [key, roomId] of this.giftMessages) if (roomId === this.room.roomId) this.giftMessages.delete(key);
       this.demoVisits = null;
       this.demoMemos = null;
+      this.demoActionRows.clear();
+      this.actionsRevision++;
       // デモの部屋を本物の来店カウンタに残さない。次の roomInfo で切り替わる。
       this.room = { roomId: '' };
       this.feed = resetForNewRoom(this.feed);
@@ -405,7 +435,10 @@ export class LiveSession {
    */
   private async importArchive(a: ArchiveBackup | null, mode: 'merge' | 'replace'): Promise<number> {
     if (!a || a.rows.length === 0) return 0;
-    if (mode === 'replace') await clearArchive();
+    if (mode === 'replace') {
+      await clearArchive();
+      this.actionRows.clear();
+    }
     const hostOf = new Map<string, StreamRecord>();
     for (const s of a.streams) hostOf.set(s.roomId, s);
     const byRoom = new Map<string, FeedRow[]>();
@@ -419,6 +452,9 @@ export class LiveSession {
       await saveArchiveRows(roomId, rows, { hostUniqueId: s?.hostUniqueId, hostNickname: s?.hostNickname });
     }
     await this.pruneArchive();
+    // Saved rows must win over any pre-import in-memory copies.
+    for (const row of a.rows) this.actionRows.delete(actionKey(row));
+    this.actionsRevision++;
     return byRoom.size;
   }
 
@@ -436,13 +472,30 @@ export class LiveSession {
   }
 
   async deleteArchivedStream(roomId: string): Promise<void> {
+    await this.persist();
     for (const [id, d] of this.archiveDirty) if (d.roomId === roomId) this.archiveDirty.delete(id);
     await deleteStream(roomId);
+    for (const [key, row] of this.actionRows) if (row.roomId === roomId) this.actionRows.delete(key);
+    this.actionsRevision++;
+    this.notify();
   }
 
   async clearArchive(): Promise<void> {
+    await this.persist();
     this.archiveDirty.clear();
     await clearArchive();
+    this.actionRows.clear();
+    this.actionsRevision++;
+    this.notify();
+  }
+
+  /** 日付は日本時間。保存済みの行に受信中の最新値を重ねる。 */
+  async highlightsForDay(day: string, memoryOnly = false): Promise<ArchivedRow[]> {
+    const demo = this.demoVisits != null;
+    const [start, end] = dayRange(day);
+    if (!Number.isFinite(start)) return [];
+    const saved = demo || memoryOnly ? [] : await loadDayRows(start, end);
+    return mergeDayRows(day, saved, [...(demo ? this.demoActionRows : this.actionRows).values()]);
   }
 
   /** いま画面にある行(書き出し用)。 */

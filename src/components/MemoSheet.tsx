@@ -14,6 +14,7 @@ export interface MemoTarget {
 }
 
 interface Props {
+  history?: React.ReactNode;
   target: MemoTarget;
   current?: MemoRecord;
   showAvatars: boolean;
@@ -25,7 +26,7 @@ interface Props {
  * メモ編集のボトムシート。配信中に片手で書けるよう、画面下から出して 2 欄だけにする。
  * 保存したメモは次回以降の配信でも残り、その人の行(入室・コメント・ギフト)に表示される。
  */
-export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Props) {
+export function MemoSheet({ target, current, showAvatars, onSave, onClose, history }: Props) {
   const [note, setNote] = useState(current?.note ?? '');
   const [kana, setKana] = useState(current?.kana ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -104,6 +105,7 @@ export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Pro
         <p className="note" style={{ margin: '4px 0 0' }}>
           次回以降の配信でも残り、この人の入室・コメント・ギフトの行に表示されます。
         </p>
+        {history}
       </div>
     </>
   );

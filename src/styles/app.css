@@ -131,14 +131,16 @@ img {
 }
 
 .tabs {
+  overflow-x: auto;
   flex: none;
   display: flex;
   background: var(--bg-1);
   border-bottom: 1px solid var(--line);
 }
 .tabs button {
+  min-width: max-content;
   flex: 1;
-  padding: 9px 0;
+  padding: 9px 8px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -981,3 +983,16 @@ img {
   padding: 11px 6px;
   font-size: var(--fs-sm);
 }
+
+.highlights { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.highlight-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line); }
+.highlight-tools input { color: var(--fg); background: var(--bg-1); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; color-scheme: dark; }
+.highlight-tools span { font-size: var(--fs-sm); color: var(--fg-dim); }
+.highlight-list { overflow-y: auto; flex: 1; min-height: 0; }
+.highlight-counts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-sm); margin-top: 5px; }
+.highlight-note { margin: 6px 12px; }
+.action-history { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 12px; }
+.action-history h2 { font-size: 1rem; margin: 0 0 8px; }
+.action-entry { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.action-entry time { flex: none; font-size: var(--fs-sm); color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.action-entry span { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }

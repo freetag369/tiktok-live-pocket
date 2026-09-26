@@ -4,6 +4,7 @@ import { FeedList, type Tab } from './components/FeedList';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
+import { Highlights } from './components/Highlights';
 import type { FeedRow } from './lib/feed';
 import { FollowToast } from './components/FollowToast';
 import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
@@ -27,7 +28,7 @@ export function App() {
   const session = useMemo(() => new LiveSession(() => settingsRef.current), []);
 
   const [snap, setSnap] = useState<SessionSnapshot>(() => session.snapshot());
-  const [tab, setTab] = useState<Tab>('all');
+  const [tab, setTab] = useState<Tab | 'highlights'>('all');
   const [showSettings, setShowSettings] = useState(() => !settings.hostUniqueId || !settings.eulerApiKey);
   const [showViewers, setShowViewers] = useState(false);
   const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
@@ -89,11 +90,12 @@ export function App() {
   const viewerItems = useMemo(() => (showViewers ? session.viewersForList() : []), [showViewers, session, snap.memos, snap.knownViewers]);
 
   const f = snap.feed;
-  const tabs: Array<[Tab, string, number | null]> = [
+  const tabs: Array<[Tab | 'highlights', string, number | null]> = [
     ['all', 'すべて', null],
     ['comment', 'コメント', f.commentCount],
     ['join', '入室', f.joinCount],
     ['gift', 'ギフト', f.giftCount],
+    ['highlights', 'ハイライト', null],
   ];
 
   return (
@@ -119,7 +121,7 @@ export function App() {
           </button>
         ))}
       </nav>
-      <FeedList
+      {tab === 'highlights' ? <Highlights session={session} revision={snap.actionsRevision} memos={snap.memos} showAvatars={settings.showAvatars} archiveEnabled={settings.archiveEnabled} /> : <FeedList
         rows={f.rows}
         tab={tab}
         showAvatars={settings.showAvatars}
@@ -143,7 +145,7 @@ export function App() {
             </>
           )
         }
-      />
+      />}
       <div style={{ flex: 'none', padding: '8px 12px calc(var(--safe-bottom) + 8px)', background: 'var(--bg-1)', borderTop: '1px solid var(--line)' }}>
         <button className={`btn ${connected ? '' : 'primary'}`} style={{ margin: 0 }} disabled={!connected && !canConnect} onClick={toggleConnect}>
           {connected ? '切断' : snap.demo ? 'デモを止めて接続' : '接続'}
