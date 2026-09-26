@@ -5,8 +5,8 @@ import type { MemoRecord } from '../lib/memos';
 import { FeedRowView } from './FeedRow';
 
 export { filterRows, type Tab };
-/** 画面のタブ全体。いいねはランキング画面なので行を流さない。 */
-export type ScreenTab = Tab | 'like';
+/** 画面のタブ全体。いいねはランキング、やり取りは人物一覧なので行を流さない。 */
+export type ScreenTab = Tab | 'like' | 'people';
 
 /** 一度に描く行数。これより前は「↑ さらに前」で足す(行が何万あっても DOM は軽いまま)。 */
 export const WINDOW = 300;

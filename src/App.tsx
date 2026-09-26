@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Header } from './components/Header';
 import { FeedList, type ScreenTab } from './components/FeedList';
 import { LikeRanking } from './components/LikeRanking';
+import { Interactions } from './components/Interactions';
 import { LikeToasts } from './components/LikeToasts';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
@@ -108,6 +109,8 @@ export function App() {
     ['join', '入室', f.joinCount],
     ['gift', 'ギフト', f.giftCount],
     ['like', 'いいね', f.likeCount],
+    // 人数は出さない(snapshot ごとに全行を数えないため。幅の節約にもなる)
+    ['people', 'やり取り', null],
   ];
   const emptyText =
     connected || snap.demo ? (
@@ -166,7 +169,31 @@ export function App() {
           <button onClick={() => setConfirmClear(false)}>やめる</button>
         </div>
       ) : null}
-      {tab === 'like' ? (
+      {tab === 'people' ? (
+        <Interactions
+          session={session}
+          roomId={f.roomId}
+          rows={f.rows}
+          likes={f.likes}
+          likeCount={f.likeCount}
+          screenEpoch={snap.screenEpoch}
+          memos={snap.memos}
+          showAvatars={settings.showAvatars}
+          bigGiftDiamonds={settings.bigGiftDiamonds}
+          onMemo={setMemoTarget}
+          empty={
+            connected || snap.demo ? (
+              <>
+                まだやり取りはありません。
+                <br />
+                コメント・ギフト・いいねをくれた人がここに並びます。
+              </>
+            ) : (
+              emptyText
+            )
+          }
+        />
+      ) : tab === 'like' ? (
         <LikeRanking
           likes={f.likes}
           likeCount={f.likeCount}
