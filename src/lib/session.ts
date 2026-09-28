@@ -49,6 +49,7 @@ export interface ViewerListItem {
   avatarUrl?: string;
   visits: number;
   lastSeenMs: number;
+  lastJoinedMs?: number;
   memo?: MemoRecord;
 }
 
@@ -349,6 +350,7 @@ export class LiveSession {
     const meta = (this.demoVisits ?? this.visits).touch(v, now);
     if (e.kind === 'gift') this.catalog.observe(e, now);
     const next = applyEvent(this.feed, e, meta, e.kind === 'gift' ? this.catalog.iconOf(e.giftId) : undefined, now);
+    if (next !== this.feed && e.kind === 'join' && e.action === 1) (this.demoVisits ?? this.visits).recordJoin(v.userId, e.tsMs);
     if (next !== this.feed) {
       // デモは本物のアーカイブ・画面の履歴に残さない。roomInfo 前の行(部屋が不明)も残さない。
       if (next.lastTouched && this.room.roomId && !this.parkedFeed) {
@@ -493,7 +495,7 @@ export class LiveSession {
     for (const v of this.visits.all()) {
       seen.add(v.userId);
       const memo = this.memos.get(v.userId);
-      out.push({ userId: v.userId, nickname: v.nickname, uniqueId: v.uniqueId, avatarUrl: v.avatarUrl, visits: v.visits, lastSeenMs: v.lastSeenMs, memo });
+      out.push({ userId: v.userId, nickname: v.nickname, uniqueId: v.uniqueId, avatarUrl: v.avatarUrl, visits: v.visits, lastSeenMs: v.lastSeenMs, lastJoinedMs: v.lastJoinedMs, memo });
     }
     out.sort((a, b) => b.lastSeenMs - a.lastSeenMs);
     for (const m of this.memos.all()) {

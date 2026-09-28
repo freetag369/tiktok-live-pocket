@@ -1349,3 +1349,8 @@ img {
   font-size: var(--fs-sm);
   animation: pulse 0.4s ease-out;
 }
+
+.viewers-list .vrow .time {
+  max-width: 100%;
+  white-space: normal;
+}

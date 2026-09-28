@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ViewerListItem } from '../lib/session';
-import { relativeDay } from '../lib/format';
+import { lastJoined } from '../lib/format';
 import { Avatar } from './Avatar';
 import { VisitBadge } from './Badges';
 
@@ -65,7 +65,7 @@ export function ViewersSheet({ items, showAvatars, onPick, onClose }: Props) {
                   {it.memo?.kana ? <span className="kana">({it.memo.kana})</span> : null}
                   {handle && handle !== name ? <span className="handle">@{handle}</span> : null}
                   {it.visits > 0 ? <VisitBadge visits={it.visits} firstEver={false} /> : null}
-                  <span className="time">{it.lastSeenMs ? relativeDay(it.lastSeenMs) : ''}</span>
+                  <span className="time">最終入室：{lastJoined(it.lastJoinedMs)}</span>
                 </div>
                 {it.memo?.note ? <div className="memo-line">📝 {it.memo.note}</div> : <div className="memo-line faint">メモなし</div>}
               </div>
