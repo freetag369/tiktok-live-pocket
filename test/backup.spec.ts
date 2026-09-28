@@ -153,7 +153,7 @@ describe('配信ログ', () => {
     // 本文の改行(LF)は引用の中なので CRLF 分割では増えない
     expect(lines.length).toBe(1 + rows.length);
     expect(csv).toContain('"\'=SUM(1)\n改行"');
-    expect(csv).toContain(',ギフト,ゆな,,Rose,5655,8,8,1,1');
+    expect(csv).toContain(',ギフト,ゆな,,バラ,5655,8,8,1,1');
     expect(csv).toContain(',フォロー,');
   });
 

@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { FeedRow as Row } from '../lib/feed';
 import { hhmm, num } from '../lib/format';
+import { japaneseGiftName } from '../lib/gift-names';
 import { Avatar, GiftIcon } from './Avatar';
 import { GradeBadge, RoleBadges, VisitBadge } from './Badges';
 
@@ -95,7 +96,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
             </div>
             {memoEl}
             <div className="gift-line">
-              <span className="gift-name">{row.giftName}</span>
+              <span className="gift-name">{japaneseGiftName(row.giftName, row.giftId)}</span>
               {row.count > 1 || row.streaking ? (
                 <span key={row.count} className={`gift-cnt${row.streaking ? ' streak' : ''}`}>
                   ×{row.count}

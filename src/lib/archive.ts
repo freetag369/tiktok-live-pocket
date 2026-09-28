@@ -1,6 +1,7 @@
 import type { Viewer } from './events';
 import { filterRows, type FeedRow, type Tab } from './feed';
 import { stamp } from './format';
+import { japaneseGiftName } from './gift-names';
 
 /**
  * アーカイブ(配信ごとの全行)の純粋ロジック。IndexedDB への読み書きは db.ts。
@@ -61,7 +62,7 @@ export function filterArchiveRows(rows: FeedRow[], tab: Tab, query: string): Fee
     const v = r.viewer;
     if (v.nickname?.toLowerCase().includes(q) || v.uniqueId?.toLowerCase().includes(q)) return true;
     if (r.k === 'comment') return r.text.toLowerCase().includes(q);
-    if (r.k === 'gift') return r.giftName.toLowerCase().includes(q);
+    if (r.k === 'gift') return r.giftName.toLowerCase().includes(q) || japaneseGiftName(r.giftName, r.giftId).toLowerCase().includes(q);
     return false;
   });
 }
