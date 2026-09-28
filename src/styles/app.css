@@ -1354,3 +1354,11 @@ img {
   max-width: 100%;
   white-space: normal;
 }
+
+.last-joined {
+  margin-top: 3px;
+  color: var(--fg-dim);
+  font-size: var(--fs-xs);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

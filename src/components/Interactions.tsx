@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FeedItem, FeedRow } from '../lib/feed';
-import { hhmm, num } from '../lib/format';
+import { hhmm, num, lastJoined } from '../lib/format';
 import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sortInteractions, type Interaction, type InteractionSort } from '../lib/interactions';
 import type { LikeEntry } from '../lib/likes';
 import type { MemoRecord } from '../lib/memos';
@@ -93,7 +93,7 @@ export function Interactions({ session, roomId, rows, likes, likeCount, screenEp
           <div className="people-list">
             {list.length === 0 ? <div className="empty">該当する人がいません。</div> : null}
             {list.map((it) => (
-              <PersonRow key={it.userId} it={it} memo={memos.get(it.userId)} showAvatars={showAvatars} onPick={() => setOpen(it.userId)} />
+              <PersonRow key={it.userId} lastJoinedMs={session.lastJoinedFor(it.userId)} it={it} memo={memos.get(it.userId)} showAvatars={showAvatars} onPick={() => setOpen(it.userId)} />
             ))}
           </div>
         </>
@@ -125,7 +125,7 @@ function Counts({ it }: { it: Interaction }) {
   );
 }
 
-function PersonRow({ it, memo, showAvatars, onPick }: { it: Interaction; memo?: MemoRecord; showAvatars: boolean; onPick: () => void }) {
+function PersonRow({ it, memo, showAvatars, onPick, lastJoinedMs }: { lastJoinedMs?: number; it: Interaction; memo?: MemoRecord; showAvatars: boolean; onPick: () => void }) {
   const { name, handle } = nameOf(it, memo);
   return (
     <button className={`vrow prow${memo ? ' has-memo' : ''}`} onClick={onPick}>
@@ -138,6 +138,7 @@ function PersonRow({ it, memo, showAvatars, onPick }: { it: Interaction; memo?: 
           <VisitBadge visits={it.visits} firstEver={it.firstEver} />
           <span className="time">{hhmm(it.lastMs)}</span>
         </div>
+        <div className="last-joined">最終入室：{lastJoined(lastJoinedMs)}</div>
         <Counts it={it} />
         {memo?.note ? <div className="memo-line">📝 {memo.note}</div> : null}
       </div>

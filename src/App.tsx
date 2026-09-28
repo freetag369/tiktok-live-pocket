@@ -99,7 +99,7 @@ export function App() {
   }, []);
 
   // リスナー一覧はシートを開いている間だけ組み立てる(メモ・来店履歴が変わったら作り直す)。
-  const viewerItems = useMemo(() => (showViewers ? session.viewersForList() : []), [showViewers, session, snap.memos, snap.knownViewers]);
+  const viewerItems = useMemo(() => (showViewers ? session.viewersForList() : []), [showViewers, session, snap]);
 
   const f = snap.feed;
   const hasRows = f.rows.some((r) => r.k !== 'room');
@@ -211,6 +211,7 @@ export function App() {
             bigGiftDiamonds={settings.bigGiftDiamonds}
             memos={snap.memos}
             onTapRow={onTapRow}
+            lastJoinedFor={session.lastJoinedFor}
             empty={emptyText}
           />
           {settings.likePopup ? <LikeToasts likes={f.likes} likeCount={f.likeCount} showAvatars={settings.showAvatars} /> : null}

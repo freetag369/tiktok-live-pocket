@@ -97,6 +97,11 @@ export class VisitCounter {
     return meta;
   }
 
+  /** 1 人の最終入室日時を取得する。未記録なら undefined。 */
+  lastJoinedFor(userId: string): number | undefined {
+    return this.records.get(userId)?.lastJoinedMs;
+  }
+
   /** 入室日時だけの変更も永続化する。再送・順序逆転で時刻を戻さない。 */
   recordJoin(userId: string, tsMs: number): void {
     const rec = this.records.get(userId);

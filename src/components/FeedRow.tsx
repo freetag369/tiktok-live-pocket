@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { FeedRow as Row } from '../lib/feed';
-import { hhmm, num } from '../lib/format';
+import { hhmm, num, lastJoined } from '../lib/format';
 import { Avatar, GiftIcon } from './Avatar';
 import { GradeBadge, RoleBadges, VisitBadge } from './Badges';
 
@@ -11,11 +11,13 @@ export interface RowProps {
   /** この人のリスナーメモ(あれば)。描画時に引くので、配信中に直してもすぐ反映される。 */
   note?: string;
   kana?: string;
+  showLastJoined?: boolean;
+  lastJoinedMs?: number;
   /** 行をタップしたとき(メモを書く)。 */
   onTap?: (row: Row) => void;
 }
 
-export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, kana, onTap }: RowProps) {
+export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, kana, onTap, showLastJoined, lastJoinedMs }: RowProps) {
   const v = row.viewer;
   const name = v.nickname || v.uniqueId || v.userId;
   const handle = v.uniqueId && v.uniqueId !== v.nickname ? `@${v.uniqueId}` : '';
@@ -23,6 +25,8 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
   const click = onTap ? () => onTap(row) : undefined;
   const kanaEl = kana ? <span className="kana">({kana})</span> : null;
   const memoEl = note ? <div className="memo-line">📝 {note}</div> : null;
+
+  const joinedEl = showLastJoined ? <div className="last-joined">最終入室：{lastJoined(lastJoinedMs)}</div> : null;
 
   switch (row.k) {
     case 'comment':
@@ -38,6 +42,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
               <RoleBadges v={v} />
               <span className="time">{hhmm(row.tsMs)}</span>
             </div>
+            {joinedEl}
             {memoEl}
             <div className="text">{row.text}</div>
           </div>
@@ -57,6 +62,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
               <VisitBadge visits={row.visits} firstEver={row.firstEver} />
               <span className="time">{hhmm(row.tsMs)}</span>
             </div>
+            {joinedEl}
             {memoEl}
           </div>
         </div>
@@ -74,6 +80,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
               <VisitBadge visits={row.visits} firstEver={row.firstEver} />
               <span className="time">{hhmm(row.tsMs)}</span>
             </div>
+            {joinedEl}
             {memoEl}
           </div>
         </div>
@@ -93,6 +100,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
               <GradeBadge v={v} />
               <span className="time">{hhmm(row.tsMs)}</span>
             </div>
+            {joinedEl}
             {memoEl}
             <div className="gift-line">
               <span className="gift-name">{row.giftName}</span>

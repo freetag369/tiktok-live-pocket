@@ -480,6 +480,9 @@ export class LiveSession {
     return r;
   }
 
+  /** 表示中の実データまたはデモの最終入室日時。 */
+  lastJoinedFor = (userId: string): number | undefined => (this.demoVisits ?? this.visits).lastJoinedFor(userId);
+
   getMemo(userId: string): MemoRecord | undefined {
     return (this.demoMemos ?? this.memos).get(userId);
   }
