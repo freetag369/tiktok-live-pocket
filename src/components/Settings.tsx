@@ -116,7 +116,7 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
           <button className="btn" onClick={onOpenViewers}>
             👥 リスナー一覧・メモ
           </button>
-          <p className="note">来た人を最近来た順に並べます。タップしてメモ・よみがなを書くと、次の配信からその人の行に表示されます。配信中はフィードの行をタップしても書けます。</p>
+          <p className="note">来た人を最近来た順に並べます。タップしてメモ・前回・よみがなを書くと、次の配信からその人の行に表示されます。配信中はフィードの行をタップしても書けます。</p>
           {confirmReset ? (
             <>
               <p className="err">本当に消しますか? 全員が「初見」に戻ります(メモは残ります)。</p>

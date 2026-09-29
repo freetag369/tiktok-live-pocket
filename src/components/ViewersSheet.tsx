@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { MemoLines } from './MemoLines';
 import type { ViewerListItem } from '../lib/session';
 import { lastJoined } from '../lib/format';
 import { Avatar } from './Avatar';
@@ -27,7 +28,7 @@ export function ViewersSheet({ items, showAvatars, onPick, onClose }: Props) {
     return items.filter((it) => {
       if (memoOnly && !it.memo) return false;
       if (!needle) return true;
-      return [it.nickname, it.uniqueId, it.memo?.note, it.memo?.kana].some((s) => s && s.toLowerCase().includes(needle));
+      return [it.nickname, it.uniqueId, it.memo?.note, it.memo?.previousNote, it.memo?.kana].some((s) => s && s.toLowerCase().includes(needle));
     });
   }, [items, q, memoOnly]);
 
@@ -43,7 +44,7 @@ export function ViewersSheet({ items, showAvatars, onPick, onClose }: Props) {
         </button>
       </header>
       <div className="viewers-tools">
-        <input type="search" inputMode="search" placeholder="名前・@ハンドル・メモで検索" value={q} autoCapitalize="none" autoCorrect="off" onChange={(e) => setQ(e.target.value)} />
+        <input type="search" inputMode="search" placeholder="名前・@ハンドル・メモ・前回で検索" value={q} autoCapitalize="none" autoCorrect="off" onChange={(e) => setQ(e.target.value)} />
         <label className="viewers-toggle">
           <input type="checkbox" checked={memoOnly} onChange={(e) => setMemoOnly(e.target.checked)} /> メモありだけ
         </label>
@@ -67,7 +68,8 @@ export function ViewersSheet({ items, showAvatars, onPick, onClose }: Props) {
                   {it.visits > 0 ? <VisitBadge visits={it.visits} firstEver={false} /> : null}
                   <span className="time">前回入室：{lastJoined(it.previousJoinedMs)}</span>
                 </div>
-                {it.memo?.note ? <div className="memo-line">📝 {it.memo.note}</div> : <div className="memo-line faint">メモなし</div>}
+                <MemoLines note={it.memo?.note} previousNote={it.memo?.previousNote} />
+                {!it.memo?.note && !it.memo?.previousNote ? <div className="memo-line faint">メモなし</div> : null}
               </div>
             </button>
           );

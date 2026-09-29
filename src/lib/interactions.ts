@@ -136,6 +136,6 @@ export function filterInteractions(list: Interaction[], query: string, memos: Re
   if (!q) return list;
   return list.filter((it) => {
     const m = memos.get(it.userId);
-    return [it.viewer.nickname, it.viewer.uniqueId, m?.nickname, m?.uniqueId, m?.note, m?.kana].some((s) => s && s.toLowerCase().includes(q));
+    return [it.viewer.nickname, it.viewer.uniqueId, m?.nickname, m?.uniqueId, m?.note, m?.previousNote, m?.kana].some((s) => s && s.toLowerCase().includes(q));
   });
 }

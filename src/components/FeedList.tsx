@@ -196,7 +196,7 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
             );
           }
           const m = memos.get(r.viewer.userId);
-          return <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={m?.note} kana={m?.kana || undefined} onTap={onTapRow} showPreviousJoined={!!previousJoinedFor} previousJoinedMs={previousJoinedFor?.(r.viewer.userId)} />;
+          return <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={m?.note} previousNote={m?.previousNote} kana={m?.kana || undefined} onTap={onTapRow} showPreviousJoined={!!previousJoinedFor} previousJoinedMs={previousJoinedFor?.(r.viewer.userId)} />;
         })}
       </div>
       {!pinned && unseen > 0 ? (
