@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { MemoLines } from './MemoLines';
 import type { FeedItem, FeedRow } from '../lib/feed';
 import { hhmm, num, lastJoined } from '../lib/format';
 import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sortInteractions, type Interaction, type InteractionSort } from '../lib/interactions';
@@ -85,7 +86,7 @@ export function Interactions({ session, roomId, rows, likes, likeCount, screenEp
                 多い順
               </button>
             </div>
-            <input type="search" inputMode="search" placeholder="名前・@・メモで絞り込み" value={query} autoCapitalize="none" autoCorrect="off" onChange={(e) => setQuery(e.target.value)} />
+            <input type="search" inputMode="search" placeholder="名前・@・メモ・前回で絞り込み" value={query} autoCapitalize="none" autoCorrect="off" onChange={(e) => setQuery(e.target.value)} />
           </div>
           <p className="note people-count">
             {num(all.length)} 人{list.length !== all.length ? ` · 絞り込み ${num(list.length)} 人` : ''}。タップすると履歴とメモ。
@@ -140,7 +141,7 @@ function PersonRow({ it, memo, showAvatars, onPick, previousJoinedMs }: { previo
         </div>
         <div className="last-joined">前回入室：{lastJoined(previousJoinedMs)}</div>
         <Counts it={it} />
-        {memo?.note ? <div className="memo-line">📝 {memo.note}</div> : null}
+        <MemoLines note={memo?.note} previousNote={memo?.previousNote} />
       </div>
     </button>
   );
@@ -195,12 +196,13 @@ function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack }:
           {memo?.note ? `📝 ${memo.note}` : '📝 メモなし — タップして書く'}
         </button>
       </div>
+      {memo?.previousNote ? <button className="memo-line" onClick={openMemo}>前回：{memo.previousNote}</button> : null}
       <div className="feed archive">
         <div className="feed-inner">
           {it.rows.length === 0 ? (
             <div className="empty">この配信ではいいねだけです。</div>
           ) : (
-            it.rows.map((r) => <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={memo?.note} kana={memo?.kana || undefined} onTap={openMemo} />)
+            it.rows.map((r) => <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={memo?.note} previousNote={memo?.previousNote} kana={memo?.kana || undefined} onTap={openMemo} />)
           )}
         </div>
       </div>

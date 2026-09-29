@@ -4,6 +4,49 @@ import { KANA_MAX_LEN, MEMO_MAX_LEN, MemoBook, sanitizeMemo, type MemoRecord } f
 const T = 1_785_240_000_000;
 
 describe('MemoBook', () => {
+  it('前回だけを保存・更新・消去でき、変更したときだけビューが変わる', () => {
+    const b = new MemoBook();
+    b.set('u1', { note: '', kana: '', previousNote: '  バラのお礼  ' }, T);
+    expect(b.get('u1')?.previousNote).toBe('バラのお礼');
+    expect(b.drainDirty().put).toHaveLength(1);
+    const view = b.view();
+    b.set('u1', { note: '', kana: '', previousNote: 'バラのお礼' }, T + 1);
+    expect(b.view()).toBe(view);
+    expect(b.drainDirty().put).toEqual([]);
+    b.set('u1', { note: '', kana: '', previousNote: '旅行の話' }, T + 2);
+    expect(b.view()).not.toBe(view);
+    expect(b.drainDirty().put[0]?.previousNote).toBe('旅行の話');
+    b.set('u1', { note: '', kana: '' }, T + 3);
+    expect(b.get('u1')?.previousNote).toBe('旅行の話');
+    b.set('u1', { note: '', kana: '', previousNote: '  ' }, T + 4);
+    expect(b.get('u1')).toBeUndefined();
+    expect(b.drainDirty()).toEqual({ put: [], del: ['u1'] });
+  });
+
+  it('前回は500文字まで。消去しても通常メモがあれば保持する', () => {
+    const b = new MemoBook();
+    b.set('u1', { note: '通常', kana: '', previousNote: 'あ'.repeat(501) }, T);
+    expect(b.get('u1')?.previousNote).toHaveLength(MEMO_MAX_LEN);
+    b.set('u1', { note: '通常', kana: '', previousNote: '' }, T + 1);
+    expect(b.get('u1')).toMatchObject({ note: '通常' });
+    expect(b.get('u1')?.previousNote ?? '').toBe('');
+  });
+
+  it('前回の読込・統合・置き換え', () => {
+    const record = { userId: 'u1', note: '', kana: '', previousNote: 'お礼', updatedMs: T };
+    const b = new MemoBook([record]);
+    expect(b.get('u1')).toEqual(record);
+    expect(b.import([{ ...record, previousNote: '古い', updatedMs: T - 1 }], 'merge')).toBe(0);
+    b.import([{ ...record, previousNote: '新しい', updatedMs: T + 1 }], 'merge');
+    expect(b.get('u1')?.previousNote).toBe('新しい');
+    b.import([{ userId: 'u2', note: '旧形式', kana: '', updatedMs: T }], 'replace');
+    expect(b.get('u1')).toBeUndefined();
+    expect(b.get('u2')?.previousNote ?? '').toBe('');
+    expect(sanitizeMemo({ userId: 'u', previousNote: '  お礼  ' })?.previousNote).toBe('お礼');
+    expect(sanitizeMemo({ userId: 'u', previousNote: 42 })).toBeNull();
+    expect(sanitizeMemo({ userId: 'u', previousNote: 'x'.repeat(501) })?.previousNote).toHaveLength(500);
+  });
+
   it('set は trim して保存し、dirty に載る', () => {
     const b = new MemoBook();
     const r = b.set('u1', { note: '  誕生日 3/4  ', kana: ' たろう ', nickname: 'たろう', uniqueId: 'taro' }, T);

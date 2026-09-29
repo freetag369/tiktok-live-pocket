@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { MemoLines } from './MemoLines';
 import type { FeedRow as Row } from '../lib/feed';
 import { hhmm, num, lastJoined } from '../lib/format';
 import { Avatar, GiftIcon } from './Avatar';
@@ -10,6 +11,7 @@ export interface RowProps {
   bigGiftDiamonds: number;
   /** この人のリスナーメモ(あれば)。描画時に引くので、配信中に直してもすぐ反映される。 */
   note?: string;
+  previousNote?: string;
   kana?: string;
   showPreviousJoined?: boolean;
   previousJoinedMs?: number;
@@ -17,14 +19,14 @@ export interface RowProps {
   onTap?: (row: Row) => void;
 }
 
-export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, kana, onTap, showPreviousJoined, previousJoinedMs }: RowProps) {
+export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, previousNote, kana, onTap, showPreviousJoined, previousJoinedMs }: RowProps) {
   const v = row.viewer;
   const name = v.nickname || v.uniqueId || v.userId;
   const handle = v.uniqueId && v.uniqueId !== v.nickname ? `@${v.uniqueId}` : '';
-  const extra = `${row.firstEver ? ' first' : ''}${note ? ' has-memo' : ''}${onTap ? ' tappable' : ''}`;
+  const extra = `${row.firstEver ? ' first' : ''}${note || previousNote ? ' has-memo' : ''}${onTap ? ' tappable' : ''}`;
   const click = onTap ? () => onTap(row) : undefined;
   const kanaEl = kana ? <span className="kana">({kana})</span> : null;
-  const memoEl = note ? <div className="memo-line">📝 {note}</div> : null;
+  const memoEl = <MemoLines note={note} previousNote={previousNote} />;
 
   const joinedEl = showPreviousJoined ? <div className="last-joined">前回入室：{lastJoined(previousJoinedMs)}</div> : null;
 

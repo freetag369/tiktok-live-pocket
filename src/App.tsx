@@ -195,6 +195,7 @@ export function App() {
         />
       ) : tab === 'like' ? (
         <LikeRanking
+          memos={snap.memos}
           likes={f.likes}
           likeCount={f.likeCount}
           likeRoomTotal={f.likeRoomTotal}
@@ -222,7 +223,7 @@ export function App() {
           {connected ? '切断' : snap.demo ? 'デモを止めて接続' : '接続'}
         </button>
       </div>
-      {showArchive ? <ArchiveSheet session={session} settings={settings} currentRoomId={snap.demo ? '' : snap.room.roomId} onClose={() => setShowArchive(false)} /> : null}
+      {showArchive ? <ArchiveSheet memos={snap.archiveMemos} session={session} settings={settings} currentRoomId={snap.demo ? '' : snap.room.roomId} onClose={() => setShowArchive(false)} /> : null}
       {showSettings ? (
         <SettingsSheet
           value={settings}

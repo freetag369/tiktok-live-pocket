@@ -22,11 +22,12 @@ interface Props {
 }
 
 /**
- * メモ編集のボトムシート。配信中に片手で書けるよう、画面下から出して 2 欄だけにする。
+ * メモ編集のボトムシート。配信中に片手で書けるよう、画面下から出して メモ・前回・よみがなを入力する。
  * 保存したメモは次回以降の配信でも残り、その人の行(入室・コメント・ギフト)に表示される。
  */
 export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Props) {
   const [note, setNote] = useState(current?.note ?? '');
+  const [previousNote, setPreviousNote] = useState(current?.previousNote ?? '');
   const [kana, setKana] = useState(current?.kana ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
   const name = target.nickname || current?.nickname || target.uniqueId || current?.uniqueId || target.userId;
@@ -39,14 +40,14 @@ export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Pro
   }, []);
 
   const save = () => {
-    onSave({ note, kana, nickname: target.nickname || current?.nickname, uniqueId: target.uniqueId || current?.uniqueId });
+    onSave({ note, previousNote, kana, nickname: target.nickname || current?.nickname, uniqueId: target.uniqueId || current?.uniqueId });
     onClose();
   };
   const remove = () => {
-    onSave({ note: '', kana: '' });
+    onSave({ note: '', previousNote: '', kana: '' });
     onClose();
   };
-  const unchanged = note.trim() === (current?.note ?? '') && kana.trim() === (current?.kana ?? '');
+  const unchanged = previousNote.trim() === (current?.previousNote ?? '') && note.trim() === (current?.note ?? '') && kana.trim() === (current?.kana ?? '');
 
   return (
     <>
@@ -84,6 +85,11 @@ export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Pro
           onChange={(e) => setNote(e.target.value)}
         />
         <label className="msheet-label">
+          前回
+          <span className="cnt">{previousNote.length}/{MEMO_MAX_LEN}</span>
+        </label>
+        <textarea aria-label="前回" rows={3} maxLength={MEMO_MAX_LEN} value={previousNote} placeholder="例: バラのお礼を伝える / 前回は旅行の話をした" onChange={(e) => setPreviousNote(e.target.value)} />
+        <label className="msheet-label">
           よみがな
           <small>名前を呼ぶとき用。名前の横に(かな)で出ます</small>
         </label>
@@ -102,7 +108,7 @@ export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Pro
           </button>
         </div>
         <p className="note" style={{ margin: '4px 0 0' }}>
-          次回以降の配信でも残り、この人の入室・コメント・ギフトの行に表示されます。
+          次回以降の配信でも残り、この人の各一覧の行に表示されます。
         </p>
       </div>
     </>

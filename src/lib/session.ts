@@ -37,6 +37,8 @@ export interface SessionSnapshot {
   knownViewers: number;
   /** リスナーメモ(userId → メモ)。行の描画時に引く。中身が変わったときだけ参照が変わる。 */
   memos: ReadonlyMap<string, MemoRecord>;
+  /** 本物のアーカイブはデモ中も保存済みメモを参照する。 */
+  archiveMemos: ReadonlyMap<string, MemoRecord>;
   /** 画面をまるごと入れ替えた回数(🧹・復元・デモの出入り)。FeedList の作り直しに使う。 */
   screenEpoch: number;
 }
@@ -200,6 +202,7 @@ export class LiveSession {
       demo: this.demoStop != null,
       knownViewers: this.visits.size,
       memos: (this.demoMemos ?? this.memos).view(),
+      archiveMemos: this.memos.view(),
       screenEpoch: this.screenEpoch,
     };
   }
@@ -471,7 +474,7 @@ export class LiveSession {
 
   // ── リスナーメモ ─────────────────────────────────────────────────
 
-  /** メモを書く(両方空なら削除)。デモ中は使い捨て帳に書く。すぐ保存する。 */
+  /** メモを書く(3 項目すべて空なら削除)。デモ中は使い捨て帳に書く。すぐ保存する。 */
   setMemo(userId: string, patch: MemoPatch, now = Date.now()): MemoRecord | null {
     const book = this.demoMemos ?? this.memos;
     const r = book.set(userId, patch, now);

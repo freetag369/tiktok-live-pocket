@@ -15,6 +15,12 @@ const gifts = [{ giftId: '5655', name: 'Rose', diamonds: 1, iconUrl: 'https://p1
 const memos = [{ userId: 'u1', note: '誕生日 3/4', kana: 'えー', updatedMs: T, nickname: 'A', uniqueId: 'a' }];
 
 describe('backup round trip', () => {
+  it('前回だけのメモもバックアップで復元できる', () => {
+    const previous = [{ userId: 'u3', note: '', kana: '', previousNote: 'ギフトのお礼', updatedMs: T }];
+    const b = buildBackup({ settings, visits, gifts, memos: previous, includeApiKey: false, appVersion: '0.1.0' });
+    expect(parseBackup(JSON.stringify(b)).memos).toEqual(previous);
+  });
+
   it('書き出し → 読み込みで来店履歴・ギフト・メモが戻る。API キーは既定で含めない', () => {
     const b = buildBackup({ settings, visits, gifts, memos, includeApiKey: false, appVersion: '0.1.0', now: new Date(T) });
     const text = JSON.stringify(b);

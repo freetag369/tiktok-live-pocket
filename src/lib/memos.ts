@@ -1,5 +1,5 @@
 /**
- * リスナーメモ(メモ本文 + よみがな)。
+ * リスナーメモ(メモ本文 + 前回 + よみがな)。
  *
  * 来店履歴(VisitRecord)とは別のストアに持つ。理由:
  *  - 「来店履歴をリセット」(全員を初見に戻す)でメモが消えないようにする
@@ -9,8 +9,10 @@
 
 export interface MemoRecord {
   userId: string;
-  /** メモ本文。空にはしない(両方空なら削除する)。 */
+  /** メモ本文。3 項目すべて空なら削除する。 */
   note: string;
+  /** 前回のお礼ややり取り。旧データの省略は空欄として扱う。 */
+  previousNote?: string;
   /** よみがな(名前を呼ぶとき用)。無ければ ''。 */
   kana: string;
   updatedMs: number;
@@ -21,6 +23,8 @@ export interface MemoRecord {
 
 export interface MemoPatch {
   note: string;
+  /** 省略時は現在の内容を保持。空文字を渡すと消去。 */
+  previousNote?: string;
   kana: string;
   nickname?: string;
   uniqueId?: string;
@@ -53,7 +57,7 @@ export class MemoBook {
   }
 
   /**
-   * メモを書く。note・kana は trim して長さを丸める。両方空なら削除。
+   * メモを書く。各欄は trim して長さを丸める。3 項目すべて空なら削除。
    * 変化があったときだけ dirty になり、view() の参照が変わる。
    */
   set(userId: string, patch: MemoPatch, now: number): MemoRecord | null {
@@ -61,7 +65,8 @@ export class MemoBook {
     const note = clip(patch.note, MEMO_MAX_LEN);
     const kana = clip(patch.kana, KANA_MAX_LEN);
     const cur = this.map.get(userId);
-    if (!note && !kana) {
+    const previousNote = clip(patch.previousNote ?? cur?.previousNote, MEMO_MAX_LEN);
+    if (!note && !kana && !previousNote) {
       if (cur) {
         this.map.delete(userId);
         this.dirty.delete(userId);
@@ -71,11 +76,12 @@ export class MemoBook {
       return null;
     }
     const next: MemoRecord = { userId, note, kana, updatedMs: now };
+    if (previousNote) next.previousNote = previousNote;
     const nickname = patch.nickname ?? cur?.nickname;
     const uniqueId = patch.uniqueId ?? cur?.uniqueId;
     if (nickname) next.nickname = nickname;
     if (uniqueId) next.uniqueId = uniqueId;
-    if (cur && cur.note === note && cur.kana === kana && cur.nickname === next.nickname && cur.uniqueId === next.uniqueId) return cur;
+    if (cur && cur.note === note && cur.kana === kana && (cur.previousNote ?? '') === previousNote && cur.nickname === next.nickname && cur.uniqueId === next.uniqueId) return cur;
     this.map.set(userId, next);
     this.dirty.add(userId);
     this.removed.delete(userId);
@@ -155,8 +161,10 @@ export function sanitizeMemo(raw: unknown): MemoRecord | null {
   if (!userId) return null;
   const note = clip(r.note, MEMO_MAX_LEN);
   const kana = clip(r.kana, KANA_MAX_LEN);
-  if (!note && !kana) return null;
+  const previousNote = clip(r.previousNote, MEMO_MAX_LEN);
+  if (!note && !kana && !previousNote) return null;
   const out: MemoRecord = { userId, note, kana, updatedMs: Number(r.updatedMs) || 0 };
+  if (previousNote) out.previousNote = previousNote;
   if (typeof r.nickname === 'string' && r.nickname) out.nickname = r.nickname;
   if (typeof r.uniqueId === 'string' && r.uniqueId) out.uniqueId = r.uniqueId;
   return out;
