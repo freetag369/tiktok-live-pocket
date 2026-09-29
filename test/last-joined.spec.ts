@@ -27,10 +27,12 @@ describe('最終入室日時', () => {
 
   it('日時だけの変更を保存し、再読み込み後も保持する', async () => {
     const counter = new VisitCounter([record]);
+    counter.setRoom('room');
     counter.recordJoin(viewer.userId, T);
     await saveVisits(counter.drainDirty());
     const restored = new VisitCounter(await loadVisits());
     expect(restored.all()[0]?.lastJoinedMs).toBe(T);
+    restored.setRoom('room');
     restored.recordJoin(viewer.userId, T - 1);
     restored.recordJoin(viewer.userId, T);
     expect(restored.drainDirty()).toEqual([]);
@@ -39,7 +41,7 @@ describe('最終入室日時', () => {
   });
 
   it('起動時の統合で新しい入室日時を保持する', () => {
-    const early = new VisitCounter([{ ...record, lastJoinedMs: T + 60000 }]);
+    const early = new VisitCounter([{ ...record, lastJoinedMs: T + 60000, lastJoinedRoomId: 'room' }]);
     early.setRoom('room');
     const loaded = new VisitCounter([{ ...record, lastJoinedMs: T }]);
     loaded.adopt(early);
@@ -75,21 +77,21 @@ describe('最終入室日時', () => {
     const join = (id: string, ts: number, action = 1) => session!.ingest('WebcastMemberMessage', {
       common: { msgId: id, createTime: ts / 1000 }, user: { id: viewer.userId }, action,
     }, T + 300000);
-    const value = () => session!.viewersForList().find((v) => v.userId === viewer.userId)?.lastJoinedMs;
+    const value = async () => (await session!.exportData()).visits.find((v) => v.userId === viewer.userId)?.lastJoinedMs;
     join('j1', T);
-    expect(value()).toBe(T);
+    expect(await value()).toBe(T);
     join('j1', T + 60000);
     join('duplicate-entrance', T + 1000);
-    expect(value()).toBe(T);
+    expect(await value()).toBe(T);
     session.ingest('WebcastChatMessage', { common: { msgId: 'c1' }, user: { id: viewer.userId }, content: 'hello' }, T + 60000);
     join('subscribe', T + 60000, 3);
-    expect(value()).toBe(T);
+    expect(await value()).toBe(T);
     join('j2', T + 120000);
-    expect(value()).toBe(T + 120000);
+    expect(await value()).toBe(T + 120000);
     join('old', T - 60000);
-    expect(value()).toBe(T + 120000);
+    expect(await value()).toBe(T + 120000);
     session.setMemo('memo-only', { note: 'メモ', kana: '' });
-    expect(session.viewersForList().find((v) => v.userId === 'memo-only')?.lastJoinedMs).toBeUndefined();
+    expect(session.viewersForList().find((v) => v.userId === 'memo-only')?.previousJoinedMs).toBeUndefined();
     session.playDemo([]);
     join('demo-join', T + 240000);
     expect((await session.exportData()).visits.find((v) => v.userId === viewer.userId)?.lastJoinedMs).toBe(T + 120000);

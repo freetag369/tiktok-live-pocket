@@ -211,7 +211,7 @@ export function App() {
             bigGiftDiamonds={settings.bigGiftDiamonds}
             memos={snap.memos}
             onTapRow={onTapRow}
-            lastJoinedFor={session.lastJoinedFor}
+            previousJoinedFor={session.previousJoinedFor}
             empty={emptyText}
           />
           {settings.likePopup ? <LikeToasts likes={f.likes} likeCount={f.likeCount} showAvatars={settings.showAvatars} /> : null}

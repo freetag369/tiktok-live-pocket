@@ -49,7 +49,7 @@ export interface ViewerListItem {
   avatarUrl?: string;
   visits: number;
   lastSeenMs: number;
-  lastJoinedMs?: number;
+  previousJoinedMs?: number;
   memo?: MemoRecord;
 }
 
@@ -480,8 +480,8 @@ export class LiveSession {
     return r;
   }
 
-  /** 表示中の実データまたはデモの最終入室日時。 */
-  lastJoinedFor = (userId: string): number | undefined => (this.demoVisits ?? this.visits).lastJoinedFor(userId);
+  /** 表示中の実データまたはデモの前回入室日時。 */
+  previousJoinedFor = (userId: string): number | undefined => (this.demoVisits ?? this.visits).previousJoinedFor(userId);
 
   getMemo(userId: string): MemoRecord | undefined {
     return (this.demoMemos ?? this.memos).get(userId);
@@ -498,7 +498,7 @@ export class LiveSession {
     for (const v of this.visits.all()) {
       seen.add(v.userId);
       const memo = this.memos.get(v.userId);
-      out.push({ userId: v.userId, nickname: v.nickname, uniqueId: v.uniqueId, avatarUrl: v.avatarUrl, visits: v.visits, lastSeenMs: v.lastSeenMs, lastJoinedMs: v.lastJoinedMs, memo });
+      out.push({ userId: v.userId, nickname: v.nickname, uniqueId: v.uniqueId, avatarUrl: v.avatarUrl, visits: v.visits, lastSeenMs: v.lastSeenMs, previousJoinedMs: this.visits.previousJoinedFor(v.userId), memo });
     }
     out.sort((a, b) => b.lastSeenMs - a.lastSeenMs);
     for (const m of this.memos.all()) {

@@ -93,7 +93,7 @@ export function Interactions({ session, roomId, rows, likes, likeCount, screenEp
           <div className="people-list">
             {list.length === 0 ? <div className="empty">該当する人がいません。</div> : null}
             {list.map((it) => (
-              <PersonRow key={it.userId} lastJoinedMs={session.lastJoinedFor(it.userId)} it={it} memo={memos.get(it.userId)} showAvatars={showAvatars} onPick={() => setOpen(it.userId)} />
+              <PersonRow key={it.userId} previousJoinedMs={session.previousJoinedFor(it.userId)} it={it} memo={memos.get(it.userId)} showAvatars={showAvatars} onPick={() => setOpen(it.userId)} />
             ))}
           </div>
         </>
@@ -125,7 +125,7 @@ function Counts({ it }: { it: Interaction }) {
   );
 }
 
-function PersonRow({ it, memo, showAvatars, onPick, lastJoinedMs }: { lastJoinedMs?: number; it: Interaction; memo?: MemoRecord; showAvatars: boolean; onPick: () => void }) {
+function PersonRow({ it, memo, showAvatars, onPick, previousJoinedMs }: { previousJoinedMs?: number; it: Interaction; memo?: MemoRecord; showAvatars: boolean; onPick: () => void }) {
   const { name, handle } = nameOf(it, memo);
   return (
     <button className={`vrow prow${memo ? ' has-memo' : ''}`} onClick={onPick}>
@@ -138,7 +138,7 @@ function PersonRow({ it, memo, showAvatars, onPick, lastJoinedMs }: { lastJoined
           <VisitBadge visits={it.visits} firstEver={it.firstEver} />
           <span className="time">{hhmm(it.lastMs)}</span>
         </div>
-        <div className="last-joined">最終入室：{lastJoined(lastJoinedMs)}</div>
+        <div className="last-joined">前回入室：{lastJoined(previousJoinedMs)}</div>
         <Counts it={it} />
         {memo?.note ? <div className="memo-line">📝 {memo.note}</div> : null}
       </div>

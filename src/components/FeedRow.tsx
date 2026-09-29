@@ -11,13 +11,13 @@ export interface RowProps {
   /** この人のリスナーメモ(あれば)。描画時に引くので、配信中に直してもすぐ反映される。 */
   note?: string;
   kana?: string;
-  showLastJoined?: boolean;
-  lastJoinedMs?: number;
+  showPreviousJoined?: boolean;
+  previousJoinedMs?: number;
   /** 行をタップしたとき(メモを書く)。 */
   onTap?: (row: Row) => void;
 }
 
-export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, kana, onTap, showLastJoined, lastJoinedMs }: RowProps) {
+export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, kana, onTap, showPreviousJoined, previousJoinedMs }: RowProps) {
   const v = row.viewer;
   const name = v.nickname || v.uniqueId || v.userId;
   const handle = v.uniqueId && v.uniqueId !== v.nickname ? `@${v.uniqueId}` : '';
@@ -26,7 +26,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
   const kanaEl = kana ? <span className="kana">({kana})</span> : null;
   const memoEl = note ? <div className="memo-line">📝 {note}</div> : null;
 
-  const joinedEl = showLastJoined ? <div className="last-joined">最終入室：{lastJoined(lastJoinedMs)}</div> : null;
+  const joinedEl = showPreviousJoined ? <div className="last-joined">前回入室：{lastJoined(previousJoinedMs)}</div> : null;
 
   switch (row.k) {
     case 'comment':

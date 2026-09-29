@@ -24,6 +24,11 @@ export interface VisitRecord {
   lastSeenMs: number;
   /** 重複除去済みの入室イベントの日時。旧データは未記録。 */
   lastJoinedMs?: number;
+  lastJoinedRoomId?: string;
+  previousJoinedMs?: number;
+  previousJoinedRoomId?: string;
+  /** 前回日時を確定した配信。日時なしでも確定済みとして保存する。 */
+  previousForRoomId?: string;
 }
 
 export interface VisitMeta {
@@ -55,6 +60,8 @@ export class VisitCounter {
 
   /** イベントで見かけた viewer を記録し、その人の「何回目/初見」を返す。 */
   touch(v: Viewer, now: number): VisitMeta {
+    const existing = this.records.get(v.userId);
+    if (existing && this.roomId) this.preparePrevious(existing);
     const cached = this.latched.get(v.userId);
     if (cached) {
       this.refreshIdentity(v, now);
@@ -73,6 +80,7 @@ export class VisitCounter {
         userId: v.userId,
         visits: 1,
         lastRoomId: this.roomId,
+        previousForRoomId: this.roomId,
         uniqueId: v.uniqueId,
         nickname: v.nickname,
         avatarUrl: v.avatarUrl,
@@ -97,16 +105,32 @@ export class VisitCounter {
     return meta;
   }
 
-  /** 1 人の最終入室日時を取得する。未記録なら undefined。 */
-  lastJoinedFor(userId: string): number | undefined {
-    return this.records.get(userId)?.lastJoinedMs;
+  /** 1 人の前回入室日時を取得する。未記録なら undefined。 */
+  previousJoinedFor(userId: string): number | undefined {
+    const rec = this.records.get(userId);
+    if (!rec) return undefined;
+    if (this.roomId && rec.previousForRoomId !== this.roomId) {
+      return rec.lastJoinedRoomId && rec.lastJoinedRoomId !== this.roomId ? rec.lastJoinedMs : undefined;
+    }
+    return rec.previousJoinedMs;
+  }
+
+  private preparePrevious(rec: VisitRecord): void {
+    if (rec.previousForRoomId === this.roomId) return;
+    const knownPrevious = rec.lastJoinedRoomId && rec.lastJoinedRoomId !== this.roomId;
+    rec.previousJoinedMs = knownPrevious ? rec.lastJoinedMs : undefined;
+    rec.previousJoinedRoomId = knownPrevious ? rec.lastJoinedRoomId : undefined;
+    rec.previousForRoomId = this.roomId;
+    this.dirty.add(rec.userId);
   }
 
   /** 入室日時だけの変更も永続化する。再送・順序逆転で時刻を戻さない。 */
   recordJoin(userId: string, tsMs: number): void {
     const rec = this.records.get(userId);
-    if (!rec || !Number.isFinite(tsMs) || tsMs <= 0 || tsMs <= (rec.lastJoinedMs ?? 0)) return;
+    if (!rec || !this.roomId || !Number.isFinite(tsMs) || tsMs <= 0 || tsMs <= (rec.lastJoinedMs ?? 0)) return;
+    this.preparePrevious(rec);
     rec.lastJoinedMs = tsMs;
+    rec.lastJoinedRoomId = this.roomId;
     this.dirty.add(userId);
   }
 
@@ -123,7 +147,7 @@ export class VisitCounter {
       this.touch({ userId: r.userId, uniqueId: r.uniqueId, nickname: r.nickname, avatarUrl: r.avatarUrl }, r.lastSeenMs);
       const rec = this.records.get(r.userId);
       if (!known && rec) rec.firstSeenMs = r.firstSeenMs;
-      if (r.lastJoinedMs != null) this.recordJoin(r.userId, r.lastJoinedMs);
+      if (r.lastJoinedRoomId === this.roomId && r.lastJoinedMs != null) this.recordJoin(r.userId, r.lastJoinedMs);
     }
   }
 
@@ -186,6 +210,10 @@ export class VisitCounter {
         continue;
       }
       const newer = r.lastSeenMs >= cur.lastSeenMs ? r : cur;
+      const latest = (r.lastJoinedMs ?? 0) > (cur.lastJoinedMs ?? 0) ? r : cur;
+      // 配信中に取り込んでも確定済みの「前回」は動かさない。
+      const context = this.latched.has(cur.userId) && cur.previousForRoomId === this.roomId
+        ? cur : newer.previousForRoomId ? newer : (newer === r ? cur : r);
       const merged: VisitRecord = {
         userId: cur.userId,
         visits: Math.max(cur.visits, r.visits),
@@ -195,7 +223,11 @@ export class VisitCounter {
         avatarUrl: newer.avatarUrl ?? cur.avatarUrl,
         firstSeenMs: Math.min(cur.firstSeenMs, r.firstSeenMs),
         lastSeenMs: Math.max(cur.lastSeenMs, r.lastSeenMs),
-        lastJoinedMs: Math.max(cur.lastJoinedMs ?? 0, r.lastJoinedMs ?? 0) || undefined,
+        lastJoinedMs: latest.lastJoinedMs,
+        lastJoinedRoomId: latest.lastJoinedRoomId,
+        previousJoinedMs: context.previousJoinedMs,
+        previousJoinedRoomId: context.previousJoinedRoomId,
+        previousForRoomId: context.previousForRoomId,
       };
       if (!sameRecord(merged, cur)) {
         this.records.set(cur.userId, merged);
@@ -232,12 +264,21 @@ export function sanitizeRecord(raw: unknown): VisitRecord | null {
   };
   if (typeof r.uniqueId === 'string' && r.uniqueId) out.uniqueId = r.uniqueId;
   if (typeof r.lastJoinedMs === 'number' && Number.isFinite(r.lastJoinedMs) && r.lastJoinedMs > 0) out.lastJoinedMs = r.lastJoinedMs;
+  if (out.lastJoinedMs && typeof r.lastJoinedRoomId === 'string' && r.lastJoinedRoomId) out.lastJoinedRoomId = r.lastJoinedRoomId;
+  if (typeof r.previousForRoomId === 'string' && r.previousForRoomId) {
+    out.previousForRoomId = r.previousForRoomId;
+    if (typeof r.previousJoinedMs === 'number' && Number.isFinite(r.previousJoinedMs) && r.previousJoinedMs > 0 &&
+        typeof r.previousJoinedRoomId === 'string' && r.previousJoinedRoomId && r.previousJoinedRoomId !== out.previousForRoomId) {
+      out.previousJoinedMs = r.previousJoinedMs;
+      out.previousJoinedRoomId = r.previousJoinedRoomId;
+    }
+  }
   if (typeof r.nickname === 'string' && r.nickname) out.nickname = r.nickname;
   if (typeof r.avatarUrl === 'string' && /^https?:\/\//.test(r.avatarUrl)) out.avatarUrl = r.avatarUrl;
   return out;
 }
 
-const FIELDS = ['userId', 'visits', 'lastRoomId', 'uniqueId', 'nickname', 'avatarUrl', 'firstSeenMs', 'lastSeenMs', 'lastJoinedMs'] as const;
+const FIELDS = ['userId', 'visits', 'lastRoomId', 'uniqueId', 'nickname', 'avatarUrl', 'firstSeenMs', 'lastSeenMs', 'lastJoinedMs', 'lastJoinedRoomId', 'previousJoinedMs', 'previousJoinedRoomId', 'previousForRoomId'] as const;
 function sameRecord(a: VisitRecord, b: VisitRecord): boolean {
   return FIELDS.every((k) => (a[k] ?? undefined) === (b[k] ?? undefined));
 }

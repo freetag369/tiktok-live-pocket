@@ -65,7 +65,7 @@ export function ViewersSheet({ items, showAvatars, onPick, onClose }: Props) {
                   {it.memo?.kana ? <span className="kana">({it.memo.kana})</span> : null}
                   {handle && handle !== name ? <span className="handle">@{handle}</span> : null}
                   {it.visits > 0 ? <VisitBadge visits={it.visits} firstEver={false} /> : null}
-                  <span className="time">最終入室：{lastJoined(it.lastJoinedMs)}</span>
+                  <span className="time">前回入室：{lastJoined(it.previousJoinedMs)}</span>
                 </div>
                 {it.memo?.note ? <div className="memo-line">📝 {it.memo.note}</div> : <div className="memo-line faint">メモなし</div>}
               </div>

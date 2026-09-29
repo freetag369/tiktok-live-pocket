@@ -22,7 +22,7 @@ interface Props {
   /** リスナーメモ(userId → メモ)。行ごとに値で渡すので、メモが変わった人の行だけ再描画される。 */
   memos: ReadonlyMap<string, MemoRecord>;
   onTapRow?: (row: FeedRow) => void;
-  lastJoinedFor?: (userId: string) => number | undefined;
+  previousJoinedFor?: (userId: string) => number | undefined;
 }
 
 /** 追従を止めている間の窓。止めた時の行をそのまま保ち、新着は下に少しだけ足す。 */
@@ -81,7 +81,7 @@ function topRow(el: HTMLElement): { id: string; top: number } | null {
  * 「↓ 新着 N 件」で戻る(既存 PC アプリの見逃し防止と同じ思想)。
  * 追従を止めている間は表示中の行を動かさない(上限で落ちた入室も消さない)ので、画面が跳ねない。
  */
-export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos, onTapRow, lastJoinedFor }: Props) {
+export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos, onTapRow, previousJoinedFor }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pinned, setPinned] = useState(true);
   const pinnedRef = useRef(true);
@@ -196,7 +196,7 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
             );
           }
           const m = memos.get(r.viewer.userId);
-          return <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={m?.note} kana={m?.kana || undefined} onTap={onTapRow} showLastJoined={!!lastJoinedFor} lastJoinedMs={lastJoinedFor?.(r.viewer.userId)} />;
+          return <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={m?.note} kana={m?.kana || undefined} onTap={onTapRow} showPreviousJoined={!!previousJoinedFor} previousJoinedMs={previousJoinedFor?.(r.viewer.userId)} />;
         })}
       </div>
       {!pinned && unseen > 0 ? (
