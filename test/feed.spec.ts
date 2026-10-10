@@ -9,6 +9,7 @@ import {
   enterRoom,
   FEED_KEEP_JOINS,
   filterRows,
+  firstRowsPerRoom,
   JOIN_DEDUPE_MS,
   reconcileWindow,
   restoreFeed,
@@ -288,6 +289,36 @@ describe('タブと配信の区切り(filterRows)', () => {
     expect(filterRows(s.rows, 'comment').map((r) => r.k)).toEqual(['comment', 'room']);
     expect(filterRows(s.rows, 'join').map((r) => r.k)).toEqual(['room', 'join']);
     expect(filterRows(s.rows, 'gift')).toEqual([]);
+  });
+});
+
+describe('前回メモを出す行(firstRowsPerRoom)', () => {
+  const gift = (id: string, userId: string): NormalizedEvent => ({
+    kind: 'gift', msgId: id, tsMs: NOW, viewer: { userId }, giftId: 'g', giftName: 'Rose', giftType: 0, repeatCount: 1, diamondEach: 1, streaking: false,
+  });
+
+  it('配信区間ごとに、各人の最初の行だけ', () => {
+    let s = createFeedState();
+    s = enterRoom(s, 'r1', { now: NOW });
+    s = applyEvent(s, comment('a1', 'hi', 'a'), meta);
+    s = applyEvent(s, gift('a2', 'a'), meta);
+    s = applyEvent(s, comment('b1', 'yo', 'b'), meta);
+    s = applyEvent(s, comment('a3', 'again', 'a'), meta);
+    s = enterRoom(s, 'r2', { now: NOW + 1 });
+    s = applyEvent(s, comment('a4', 'next stream', 'a'), meta);
+    s = applyEvent(s, comment('a5', 'next stream 2', 'a'), meta);
+    expect([...firstRowsPerRoom(s.rows)]).toEqual(['a1', 'b1', 'a4']);
+  });
+
+  it('タブで絞った後に使うと、そのタブで最初に見える行が対象', () => {
+    let s = createFeedState();
+    s = enterRoom(s, 'r1', { now: NOW });
+    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW, viewer: { userId: 'a' }, action: 1 }, meta);
+    s = applyEvent(s, comment('a1', 'hi', 'a'), meta);
+    s = applyEvent(s, comment('a2', 'hi again', 'a'), meta);
+    expect([...firstRowsPerRoom(filterRows(s.rows, 'all'))]).toEqual(['j1']);
+    expect([...firstRowsPerRoom(filterRows(s.rows, 'comment'))]).toEqual(['a1']);
+    expect([...firstRowsPerRoom([])]).toEqual([]);
   });
 });
 

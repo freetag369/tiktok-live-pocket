@@ -11,6 +11,7 @@ export interface RowProps {
   bigGiftDiamonds: number;
   /** この人のリスナーメモ(あれば)。描画時に引くので、配信中に直してもすぐ反映される。 */
   note?: string;
+  /** 「前回」メモ。フィードでは配信ごとにその人の最初の行にだけ渡される(FeedList 側で絞る)。 */
   previousNote?: string;
   kana?: string;
   showPreviousJoined?: boolean;
