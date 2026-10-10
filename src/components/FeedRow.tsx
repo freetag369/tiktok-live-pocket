@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { MemoLines } from './MemoLines';
 import type { FeedRow as Row } from '../lib/feed';
 import { hhmm, num, lastJoined } from '../lib/format';
+import { japaneseGiftName } from '../lib/gift-names';
 import { Avatar, GiftIcon } from './Avatar';
 import { GradeBadge, RoleBadges, VisitBadge } from './Badges';
 
@@ -70,6 +71,24 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
         </div>
       );
 
+    case 'like':
+      // いいね(1 分ごとにまとめた行)。アーカイブの「すべて」にだけ出る(画面のフィードには流さない)。
+      return (
+        <div className={`row social like${extra}`} data-id={row.id} onClick={click}>
+          <Avatar url={v.avatarUrl} name={name} enabled={showAvatars} />
+          <div className="body">
+            <div className="head">
+              <span className="who">{name}</span>
+              {kanaEl}
+              <span>がいいね ❤️ ×{num(row.count)}</span>
+              <VisitBadge visits={row.visits} firstEver={row.firstEver} />
+              <span className="time">{hhmm(row.tsMs)}</span>
+            </div>
+            {memoEl}
+          </div>
+        </div>
+      );
+
     case 'social':
       return (
         <div className={`row social${extra}`} data-id={row.id} onClick={click}>
@@ -105,7 +124,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
             {joinedEl}
             {memoEl}
             <div className="gift-line">
-              <span className="gift-name">{row.giftName}</span>
+              <span className="gift-name">{japaneseGiftName(row.giftName, row.giftId)}</span>
               {row.count > 1 || row.streaking ? (
                 <span key={row.count} className={`gift-cnt${row.streaking ? ' streak' : ''}`}>
                   ×{row.count}

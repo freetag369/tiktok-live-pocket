@@ -19,13 +19,17 @@ interface Props {
   showAvatars: boolean;
   onSave: (patch: MemoPatch) => void;
   onClose: () => void;
+  /** メモ欄の下に出すもの(ハイライトのその日の履歴)。 */
+  history?: React.ReactNode;
+  /** 開いたらメモ欄にカーソルを置く(既定 true)。履歴を見に来たときはキーボードで隠さない。 */
+  autoFocus?: boolean;
 }
 
 /**
  * メモ編集のボトムシート。配信中に片手で書けるよう、画面下から出して メモ・前回・よみがなを入力する。
  * 保存したメモは次回以降の配信でも残り、その人の行(入室・コメント・ギフト)に表示される。
  */
-export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Props) {
+export function MemoSheet({ target, current, showAvatars, onSave, onClose, history, autoFocus = true }: Props) {
   const [note, setNote] = useState(current?.note ?? '');
   const [previousNote, setPreviousNote] = useState(current?.previousNote ?? '');
   const [kana, setKana] = useState(current?.kana ?? '');
@@ -35,8 +39,10 @@ export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Pro
   const has = Boolean(current);
 
   useEffect(() => {
+    if (!autoFocus) return;
     const t = setTimeout(() => ref.current?.focus(), 50);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const save = () => {
@@ -88,7 +94,14 @@ export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Pro
           前回
           <span className="cnt">{previousNote.length}/{MEMO_MAX_LEN}</span>
         </label>
-        <textarea aria-label="前回" rows={3} maxLength={MEMO_MAX_LEN} value={previousNote} placeholder="例: バラのお礼を伝える / 前回は旅行の話をした" onChange={(e) => setPreviousNote(e.target.value)} />
+        <textarea
+          aria-label="前回"
+          rows={3}
+          maxLength={MEMO_MAX_LEN}
+          value={previousNote}
+          placeholder="例: バラのお礼を伝える / 前回は旅行の話をした"
+          onChange={(e) => setPreviousNote(e.target.value)}
+        />
         <label className="msheet-label">
           よみがな
           <small>名前を呼ぶとき用。名前の横に(かな)で出ます</small>
@@ -110,6 +123,7 @@ export function MemoSheet({ target, current, showAvatars, onSave, onClose }: Pro
         <p className="note" style={{ margin: '4px 0 0' }}>
           次回以降の配信でも残り、この人の各一覧の行に表示されます。
         </p>
+        {history}
       </div>
     </>
   );

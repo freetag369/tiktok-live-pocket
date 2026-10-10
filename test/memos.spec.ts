@@ -32,7 +32,7 @@ describe('MemoBook', () => {
     expect(b.get('u1')?.previousNote ?? '').toBe('');
   });
 
-  it('前回の読込・統合・置き換え', () => {
+  it('前回の読込・統合・置き換え・起動中の引き継ぎ', () => {
     const record = { userId: 'u1', note: '', kana: '', previousNote: 'お礼', updatedMs: T };
     const b = new MemoBook([record]);
     expect(b.get('u1')).toEqual(record);
@@ -42,6 +42,10 @@ describe('MemoBook', () => {
     b.import([{ userId: 'u2', note: '旧形式', kana: '', updatedMs: T }], 'replace');
     expect(b.get('u1')).toBeUndefined();
     expect(b.get('u2')?.previousNote ?? '').toBe('');
+    const early = new MemoBook();
+    early.set('u1', record, T);
+    b.adopt(early);
+    expect(b.get('u1')).toEqual(record);
     expect(sanitizeMemo({ userId: 'u', previousNote: '  お礼  ' })?.previousNote).toBe('お礼');
     expect(sanitizeMemo({ userId: 'u', previousNote: 42 })).toBeNull();
     expect(sanitizeMemo({ userId: 'u', previousNote: 'x'.repeat(501) })?.previousNote).toHaveLength(500);
