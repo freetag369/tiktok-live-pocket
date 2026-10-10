@@ -178,6 +178,23 @@ img {
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
+/* 本画面のタブ。入り切らない幅では横にスクロールし、🧹 は右端に残す。 */
+.tabs-scroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+.tabs-scroll button {
+  flex: 1 0 auto;
+  padding: 9px 6px;
+}
 
 .feed-wrap {
   flex: 1;
@@ -884,6 +901,10 @@ img {
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
+.viewers-list .vrow .time {
+  max-width: 100%;
+  white-space: normal;
+}
 /* ── フォロー通知(上からスライドイン) ───────────────────── */
 .follow-toast {
   position: fixed;
@@ -1361,4 +1382,143 @@ img {
   font-size: var(--fs-xs);
   white-space: normal;
   overflow-wrap: anywhere;
+}
+/* ── ハイライト(日別のメンバー一覧) ─────────────────────── */
+.hl {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hl-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 8px 12px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+}
+.hl-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hl-date input {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px; /* iOS: 16px 未満だと入力時に自動ズームする */
+  color-scheme: dark;
+}
+.hl-today {
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.hl-sum {
+  margin-left: auto;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hl-demo {
+  flex: none;
+  padding: 6px 12px;
+  font-size: var(--fs-sm);
+  color: var(--violet);
+  background: rgba(169, 128, 255, 0.12);
+  border-bottom: 1px solid rgba(169, 128, 255, 0.3);
+}
+.hl-demo b {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--violet);
+  color: var(--bg);
+}
+.hl-note {
+  flex: none;
+  margin: 6px 12px;
+}
+.hl-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 8px calc(var(--safe-bottom) + 8px);
+}
+.hl-list .vrow {
+  flex: none;
+}
+.hl-list .more {
+  flex: none;
+  width: auto;
+  margin: 12px auto;
+  padding: 10px 18px;
+}
+.hl-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 3px;
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.hl-history {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.hl-history h2 {
+  margin: 0 0 6px;
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+}
+.hl-history h2 small {
+  margin-left: 4px;
+  color: var(--fg-faint);
+  font-weight: 400;
+}
+.hl-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--fs-sm);
+}
+.hl-entry time {
+  flex: none;
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.hl-entry span {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hl-history .more {
+  width: auto;
+  margin: 10px auto 0;
+  padding: 9px 16px;
+}
+/* アーカイブの「すべて」に出る、いいね(1 分ごとにまとめた行) */
+.row.like {
+  color: var(--pink);
 }

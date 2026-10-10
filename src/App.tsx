@@ -4,6 +4,7 @@ import { FeedList, type ScreenTab } from './components/FeedList';
 import { LikeRanking } from './components/LikeRanking';
 import { Interactions } from './components/Interactions';
 import { LikeToasts } from './components/LikeToasts';
+import { Highlights } from './components/Highlights';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
@@ -16,6 +17,9 @@ import { LiveSession, type SessionSnapshot } from './lib/session';
 import { loadSettings, sanitize, saveSettings, type Settings } from './lib/settings';
 import { installWakeLockRefresh, setWakeLock } from './lib/wake-lock';
 import demoText from './fixtures/demo.ndjson?raw';
+
+/** 上のタブ。ハイライトは日別のメンバー一覧(行を流す画面ではない)。 */
+type AppTab = ScreenTab | 'highlights';
 
 function parseDemo(text: string): Array<{ o: number; type?: string; data?: unknown }> {
   return text
@@ -31,7 +35,9 @@ export function App() {
   const session = useMemo(() => new LiveSession(() => settingsRef.current), []);
 
   const [snap, setSnap] = useState<SessionSnapshot>(() => session.snapshot());
-  const [tab, setTab] = useState<ScreenTab>('all');
+  const [tab, setTab] = useState<AppTab>('all');
+  /** ハイライトで自分で選んだ日(null = 今日を追う)。タブを切り替えても残す。 */
+  const [highlightPick, setHighlightPick] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(() => !settings.hostUniqueId || !settings.eulerApiKey);
   const [showViewers, setShowViewers] = useState(false);
   const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
@@ -103,7 +109,7 @@ export function App() {
 
   const f = snap.feed;
   const hasRows = f.rows.some((r) => r.k !== 'room');
-  const tabs: Array<[ScreenTab, string, number | null]> = [
+  const tabs: Array<[AppTab, string, number | null]> = [
     ['all', 'すべて', null],
     ['comment', 'コメント', f.commentCount],
     ['join', '入室', f.joinCount],
@@ -111,6 +117,7 @@ export function App() {
     ['like', 'いいね', f.likeCount],
     // 人数は出さない(snapshot ごとに全行を数えないため。幅の節約にもなる)
     ['people', 'やり取り', null],
+    ['highlights', 'ハイライト', null],
   ];
   const emptyText =
     connected || snap.demo ? (
@@ -145,12 +152,22 @@ export function App() {
         </div>
       ) : null}
       <nav className="tabs">
-        {tabs.map(([k, label, n]) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
-            {label}
-            {n != null && n > 0 ? <span className="n">{compact(n)}</span> : null}
-          </button>
-        ))}
+        {/* 幅が足りない iPhone では横にスクロールする(🧹 は右端に残す) */}
+        <div className="tabs-scroll">
+          {tabs.map(([k, label, n]) => (
+            <button
+              key={k}
+              className={tab === k ? 'on' : ''}
+              onClick={(e) => {
+                setTab(k);
+                e.currentTarget.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+              }}
+            >
+              {label}
+              {n != null && n > 0 ? <span className="n">{compact(n)}</span> : null}
+            </button>
+          ))}
+        </div>
         <button className="tab-reset" aria-label="画面の履歴をリセット" disabled={!hasRows} onClick={() => setConfirmClear((c) => !c)}>
           🧹
         </button>
@@ -201,6 +218,17 @@ export function App() {
           likeRoomTotal={f.likeRoomTotal}
           showAvatars={settings.showAvatars}
           empty={connected || snap.demo ? <>まだいいねが届いていません。</> : emptyText}
+        />
+      ) : tab === 'highlights' ? (
+        <Highlights
+          session={session}
+          generation={snap.archiveGeneration}
+          demo={snap.demo}
+          memos={snap.highlightMemos}
+          picked={highlightPick}
+          onPick={setHighlightPick}
+          showAvatars={settings.showAvatars}
+          archiveEnabled={settings.archiveEnabled}
         />
       ) : (
         <div className="feed-wrap">

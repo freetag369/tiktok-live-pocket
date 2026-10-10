@@ -34,6 +34,23 @@ export class GiftCatalog {
     }
   }
 
+  /** 読込が終わる前に仮のカタログ(early)で見たギフトを足す(空の欄で既知の名前・画像を潰さない)。 */
+  adopt(early: GiftCatalog): void {
+    for (const r of early.map.values()) {
+      const cur = this.map.get(r.giftId);
+      const next: GiftCatalogRecord = {
+        giftId: r.giftId,
+        name: r.name || cur?.name || '',
+        diamonds: r.diamonds || cur?.diamonds || 0,
+        iconUrl: r.iconUrl || cur?.iconUrl || '',
+        updatedMs: r.updatedMs,
+      };
+      if (cur && cur.name === next.name && cur.diamonds === next.diamonds && cur.iconUrl === next.iconUrl) continue;
+      this.map.set(r.giftId, next);
+      this.dirty.add(r.giftId);
+    }
+  }
+
   drainDirty(): GiftCatalogRecord[] {
     const out: GiftCatalogRecord[] = [];
     for (const id of this.dirty) {

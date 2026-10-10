@@ -3,6 +3,7 @@ import type { VisitRecord } from './visits';
 import type { MemoRecord } from './memos';
 import type { FeedRow, ScreenItem, ScreenMeta } from './feed';
 import { applyRowToStream, type ArchivedRow, type HostInfo, type StreamRecord } from './archive';
+import { addLike } from './highlights';
 
 export interface GiftCatalogRecord {
   giftId: string;
@@ -16,8 +17,8 @@ interface PocketDB extends DBSchema {
   visits: { key: string; value: VisitRecord };
   gifts: { key: string; value: GiftCatalogRecord };
   memos: { key: string; value: MemoRecord };
-  /** アーカイブの行(全配信)。byRoomTs で配信ごとに時刻順に引ける。 */
-  logRows: { key: string; value: ArchivedRow; indexes: { byRoomTs: [string, number] } };
+  /** アーカイブの行(全配信)。byRoomTs で配信ごとに、byTs で日付(ハイライト)ごとに時刻順に引ける。 */
+  logRows: { key: string; value: ArchivedRow; indexes: { byRoomTs: [string, number]; byTs: number } };
   /** 配信ごとの集計(一覧用)。 */
   streams: { key: string; value: StreamRecord };
   /** 画面の履歴(🧹 でリセットするまで残る行と配信の区切り)。seq が並び順。 */
@@ -29,15 +30,18 @@ interface PocketDB extends DBSchema {
 export type ScreenMetaRecord = ScreenMeta & { k: 'current' };
 
 const DB_NAME = 'tiktok-live-pocket';
-/** v2: memos(リスナーメモ)、v3: logRows / streams(アーカイブ)、v4: screenRows / screenMeta(画面の履歴)。 */
-const DB_VERSION = 4;
+/**
+ * v2: memos(リスナーメモ)、v3: logRows / streams(アーカイブ)、v4: screenRows / screenMeta(画面の履歴)、
+ * v5: logRows に byTs 索引(ハイライトの日付検索)。版上げは足すだけで、既存のストアと行には触らない。
+ */
+const DB_VERSION = 5;
 
 let dbPromise: Promise<IDBPDatabase<PocketDB>> | null = null;
 
 export function getDb(): Promise<IDBPDatabase<PocketDB>> {
   if (!dbPromise) {
     dbPromise = openDB<PocketDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, _oldVersion, _newVersion, tx) {
         if (!db.objectStoreNames.contains('visits')) db.createObjectStore('visits', { keyPath: 'userId' });
         if (!db.objectStoreNames.contains('gifts')) db.createObjectStore('gifts', { keyPath: 'giftId' });
         if (!db.objectStoreNames.contains('memos')) db.createObjectStore('memos', { keyPath: 'userId' });
@@ -48,6 +52,9 @@ export function getDb(): Promise<IDBPDatabase<PocketDB>> {
         if (!db.objectStoreNames.contains('streams')) db.createObjectStore('streams', { keyPath: 'roomId' });
         if (!db.objectStoreNames.contains('screenRows')) db.createObjectStore('screenRows', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('screenMeta')) db.createObjectStore('screenMeta', { keyPath: 'k' });
+        // v5: 既存の logRows に索引だけ足す(行はそのまま。索引は版上げの中で既存の行からも作られる)。
+        const rows = tx.objectStore('logRows');
+        if (!rows.indexNames.contains('byTs')) rows.createIndex('byTs', 'tsMs');
       },
       // 別のタブが古いバージョンを掴んだままだと次の版上げが止まるので、こちらを閉じる。
       blocking() {
@@ -60,6 +67,14 @@ export function getDb(): Promise<IDBPDatabase<PocketDB>> {
     });
   }
   return dbPromise;
+}
+
+/** 開いている接続を閉じ、次の getDb() で開き直す(テストで版上げを確かめる用)。 */
+export async function closeDb(): Promise<void> {
+  const p = dbPromise;
+  dbPromise = null;
+  const db = await p?.catch(() => null);
+  db?.close();
 }
 
 export async function loadVisits(): Promise<VisitRecord[]> {
@@ -171,9 +186,14 @@ function roomRange(roomId: string): IDBKeyRange {
 /**
  * 行を保存し、配信の集計を更新する。同じ id の行は上書き(連打の ×N 更新)で、
  * 集計は保存前の行との差分だけ足すので何度呼んでも二重計上しない。
+ *
+ * `addLikes`(受信中の保存): いいねの行は「まだ保存していない分」なので、保存済みの同じ行に数を足す。
+ * 取り込み(バックアップ)では付けない — 行は合計値なので、保存済みの同じ行とは多い方を残す
+ * (何度取り込んでも増えず、途中で書き出したバックアップや別の端末の少ない数で減らさない)。
+ * 書き込めたら true(IndexedDB が使えない・失敗したら false)。
  */
-export async function saveArchiveRows(roomId: string, rows: FeedRow[], host: HostInfo): Promise<void> {
-  if (rows.length === 0) return;
+export async function saveArchiveRows(roomId: string, rows: FeedRow[], host: HostInfo, o: { addLikes?: boolean } = {}): Promise<boolean> {
+  if (rows.length === 0) return true;
   try {
     const db = await getDb();
     const tx = db.transaction(['logRows', 'streams'], 'readwrite');
@@ -182,15 +202,55 @@ export async function saveArchiveRows(roomId: string, rows: FeedRow[], host: Hos
     let stream = await streamStore.get(roomId);
     for (const row of rows) {
       const prev = await rowStore.get(row.id);
-      const rec: ArchivedRow = { ...row, roomId };
+      let rec: ArchivedRow = { ...row, roomId };
       if (rec.k === 'gift') rec.streaking = false;
+      if (rec.k === 'like' && prev?.k === 'like') {
+        rec = o.addLikes ? addLike(prev, rec) : { ...rec, count: Math.max(prev.count, rec.count), tsMs: Math.max(prev.tsMs, rec.tsMs) };
+      }
       void rowStore.put(rec);
-      stream = applyRowToStream(stream, prev, row, host, roomId);
+      stream = applyRowToStream(stream, prev, rec, host, roomId);
     }
     if (stream) void streamStore.put(stream);
     await tx.done;
+    return true;
   } catch {
-    /* ignore */
+    return false;
+  }
+}
+
+/** loadDayRows が 1 回に読む行数(1 日分をまとめて読まず、keep で絞りながら進む)。 */
+export const DAY_PAGE_ROWS = 2000;
+
+/**
+ * 日付の範囲 [startMs, endMs) の行(全配信・時刻順)のうち keep を通ったもの。読めなければ投げる(呼ぶ側が「読めなかった」と出す)。
+ * DAY_PAGE_ROWS 件ずつ読んで keep で絞るので、捨てる行(ハイライトなら入室・シェア)を 1 日分まとめて抱えない。
+ */
+export async function loadDayRows(startMs: number, endMs: number, keep: (row: ArchivedRow) => boolean = () => true, pageRows = DAY_PAGE_ROWS): Promise<ArchivedRow[]> {
+  const db = await getDb();
+  const out: ArchivedRow[] = [];
+  const take = (rows: ArchivedRow[]) => {
+    for (const r of rows) if (keep(r)) out.push(r);
+  };
+  let lower = startMs;
+  let lowerOpen = false;
+  for (;;) {
+    const page = await db.getAllFromIndex('logRows', 'byTs', IDBKeyRange.bound(lower, endMs, lowerOpen, true), pageRows);
+    if (page.length < pageRows) {
+      take(page);
+      return out;
+    }
+    // 同じ時刻の行がページの境目をまたぐので、最後の時刻の行は次のページで読む。
+    const last = page[page.length - 1]!.tsMs;
+    if (page[0]!.tsMs === last) {
+      // 1 つの時刻に 1 ページ以上ある: その時刻を丸ごと読んで先へ進む。
+      take(await db.getAllFromIndex('logRows', 'byTs', IDBKeyRange.only(last)));
+      lower = last;
+      lowerOpen = true;
+      continue;
+    }
+    take(page.filter((r) => r.tsMs < last));
+    lower = last;
+    lowerOpen = false;
   }
 }
 
