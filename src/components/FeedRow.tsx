@@ -22,7 +22,6 @@ export interface RowProps {
 export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, previousNote, kana, onTap, showPreviousJoined, previousJoinedMs }: RowProps) {
   const v = row.viewer;
   const name = v.nickname || v.uniqueId || v.userId;
-  const handle = v.uniqueId && v.uniqueId !== v.nickname ? `@${v.uniqueId}` : '';
   const extra = `${row.firstEver ? ' first' : ''}${note || previousNote ? ' has-memo' : ''}${onTap ? ' tappable' : ''}`;
   const click = onTap ? () => onTap(row) : undefined;
   const kanaEl = kana ? <span className="kana">({kana})</span> : null;
@@ -39,7 +38,6 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
             <div className="head">
               <span className="who">{name}</span>
               {kanaEl}
-              {handle ? <span className="handle">{handle}</span> : null}
               <VisitBadge visits={row.visits} firstEver={row.firstEver} />
               <RoleBadges v={v} />
               <span className="time">{hhmm(row.tsMs)}</span>
@@ -97,7 +95,6 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
             <div className="head">
               <span className="who">{name}</span>
               {kanaEl}
-              {handle ? <span className="handle">{handle}</span> : null}
               <VisitBadge visits={row.visits} firstEver={row.firstEver} />
               <GradeBadge v={v} />
               <span className="time">{hhmm(row.tsMs)}</span>

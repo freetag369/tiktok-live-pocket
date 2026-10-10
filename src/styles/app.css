@@ -291,10 +291,6 @@ img {
 .row .who {
   font-weight: 700;
 }
-.row .handle {
-  color: var(--fg-faint);
-  font-size: var(--fs-xs);
-}
 .row .time {
   margin-left: auto;
   color: var(--fg-faint);
