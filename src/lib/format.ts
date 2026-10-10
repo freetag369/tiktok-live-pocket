@@ -13,6 +13,13 @@ export function compact(n: number): string {
   return String(Math.round(n));
 }
 
+/** 最終入室日時(端末のローカル時刻)。 */
+export function lastJoined(ms?: number): string {
+  if (ms == null || !Number.isFinite(ms) || ms <= 0) return '未記録';
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}月${d.getDate()}日${d.getHours()}時`;
+}
+
 export function hhmm(ms: number): string {
   const d = new Date(ms);
   const h = String(d.getHours()).padStart(2, '0');

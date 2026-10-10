@@ -46,6 +46,20 @@ export type FeedRow =
       sub: 'follow' | 'share' | 'other';
       visits: number;
       firstEver: boolean;
+    }
+  | {
+      /**
+       * いいね(配信・人・1 分ごとに 1 行へまとめたもの。id は `like:<roomId>:<userId>:<分の頭>`)。
+       * アーカイブとハイライト専用。applyEvent は作らず(いいねは likes で集計)、画面の行・画面の履歴には入らない。
+       */
+      k: 'like';
+      id: string;
+      tsMs: number;
+      viewer: Viewer;
+      /** その 1 分に受け取ったタップ数の合計。 */
+      count: number;
+      visits: number;
+      firstEver: boolean;
     };
 
 /** 配信の境目(「── 新しい配信 ──」)。行ではないので書き出し・アーカイブには入らない。 */
@@ -85,7 +99,10 @@ export interface FeedState {
   likeCount: number;
   /** TikTok が送ってくる部屋全体の累計いいね(接続前の分も含む)。見た中の最大値。 */
   likeRoomTotal?: number;
-  /** 直近の applyEvent で作成または更新した行(アーカイブ・画面の履歴の保存用)。state が変わらなければ触らない。 */
+  /**
+   * 直近の applyEvent で作成または更新した行(アーカイブ・画面の履歴の保存用)。state が変わらなければ触らない。
+   * いいねは行を作らないので null(アーカイブ用のいいね行は session が 1 分ごとにまとめて作る)。
+   */
   lastTouched: FeedRow | null;
 }
 

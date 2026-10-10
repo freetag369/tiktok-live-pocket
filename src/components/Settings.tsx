@@ -116,7 +116,7 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
           <button className="btn" onClick={onOpenViewers}>
             👥 リスナー一覧・メモ
           </button>
-          <p className="note">来た人を最近来た順に並べます。タップしてメモ・よみがなを書くと、次の配信からその人の行に表示されます。配信中はフィードの行をタップしても書けます。</p>
+          <p className="note">来た人を最近来た順に並べます。タップしてメモ・前回・よみがなを書くと、次の配信からその人の行に表示されます。配信中はフィードの行をタップしても書けます。</p>
           {confirmReset ? (
             <>
               <p className="err">本当に消しますか? 全員が「初見」に戻ります(メモは残ります)。</p>
@@ -142,7 +142,7 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
 
         <div className="section">
           <h2>アーカイブ</h2>
-          <p className="note">受信したコメント・入室・ギフトを配信ごとに残し、右上の 🗂 から見返せます。画面を 🧹 でリセットしても、こちらは消えません。</p>
+          <p className="note">受信したコメント・入室・いいね・フォロー・ギフトを配信ごとに残し、右上の 🗂 から見返せます。ハイライトの日別の履歴もここから読みます。画面を 🧹 でリセットしても、こちらは消えません。</p>
           <div className="field">
             <label>
               アーカイブを残す

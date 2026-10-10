@@ -22,6 +22,8 @@ export interface VisitRecord {
   avatarUrl?: string;
   firstSeenMs: number;
   lastSeenMs: number;
+  /** 重複除去済みの入室イベントの日時。旧データは未記録。 */
+  lastJoinedMs?: number;
 }
 
 export interface VisitMeta {
@@ -95,6 +97,31 @@ export class VisitCounter {
     return meta;
   }
 
+  /** 入室日時だけの変更も永続化する。再送・順序逆転で時刻を戻さない。 */
+  recordJoin(userId: string, tsMs: number): void {
+    const rec = this.records.get(userId);
+    if (!rec || !Number.isFinite(tsMs) || tsMs <= 0 || tsMs <= (rec.lastJoinedMs ?? 0)) return;
+    rec.lastJoinedMs = tsMs;
+    this.dirty.add(userId);
+  }
+
+  /**
+   * 読込が終わる前に仮のカウンタ(early)で数えた分を、読み込んだ履歴で数え直す(IndexedDB が遅い起動)。
+   * early がいた部屋に切り替え、その部屋で見かけた人を保存済みの記録から数える(visits:1 で上書きしない)。
+   */
+  adopt(early: VisitCounter): void {
+    this.setRoom(early.roomId);
+    if (!this.roomId) return;
+    for (const r of early.records.values()) {
+      if (r.lastRoomId !== this.roomId) continue;
+      const known = this.records.has(r.userId);
+      this.touch({ userId: r.userId, uniqueId: r.uniqueId, nickname: r.nickname, avatarUrl: r.avatarUrl }, r.lastSeenMs);
+      const rec = this.records.get(r.userId);
+      if (!known && rec) rec.firstSeenMs = r.firstSeenMs;
+      if (r.lastJoinedMs != null) this.recordJoin(r.userId, r.lastJoinedMs);
+    }
+  }
+
   private applyIdentity(rec: VisitRecord, v: Viewer): void {
     if (v.uniqueId) rec.uniqueId = v.uniqueId;
     if (v.nickname) rec.nickname = v.nickname;
@@ -163,6 +190,7 @@ export class VisitCounter {
         avatarUrl: newer.avatarUrl ?? cur.avatarUrl,
         firstSeenMs: Math.min(cur.firstSeenMs, r.firstSeenMs),
         lastSeenMs: Math.max(cur.lastSeenMs, r.lastSeenMs),
+        lastJoinedMs: Math.max(cur.lastJoinedMs ?? 0, r.lastJoinedMs ?? 0) || undefined,
       };
       if (!sameRecord(merged, cur)) {
         this.records.set(cur.userId, merged);
@@ -198,12 +226,13 @@ export function sanitizeRecord(raw: unknown): VisitRecord | null {
     lastSeenMs,
   };
   if (typeof r.uniqueId === 'string' && r.uniqueId) out.uniqueId = r.uniqueId;
+  if (typeof r.lastJoinedMs === 'number' && Number.isFinite(r.lastJoinedMs) && r.lastJoinedMs > 0) out.lastJoinedMs = r.lastJoinedMs;
   if (typeof r.nickname === 'string' && r.nickname) out.nickname = r.nickname;
   if (typeof r.avatarUrl === 'string' && /^https?:\/\//.test(r.avatarUrl)) out.avatarUrl = r.avatarUrl;
   return out;
 }
 
-const FIELDS = ['userId', 'visits', 'lastRoomId', 'uniqueId', 'nickname', 'avatarUrl', 'firstSeenMs', 'lastSeenMs'] as const;
+const FIELDS = ['userId', 'visits', 'lastRoomId', 'uniqueId', 'nickname', 'avatarUrl', 'firstSeenMs', 'lastSeenMs', 'lastJoinedMs'] as const;
 function sameRecord(a: VisitRecord, b: VisitRecord): boolean {
   return FIELDS.every((k) => (a[k] ?? undefined) === (b[k] ?? undefined));
 }

@@ -118,6 +118,8 @@ export function rowToCsvFields(r: FeedRow): string[] {
   const who = [r.viewer.nickname ?? '', r.viewer.uniqueId ? `@${r.viewer.uniqueId}` : ''];
   const tail = [String(r.visits), r.firstEver ? '1' : '0'];
   switch (r.k) {
+    case 'like':
+      return [...base, 'いいね', ...who, '', '', String(r.count), '', ...tail];
     case 'comment':
       return [...base, 'コメント', ...who, r.text, '', '', '', ...tail];
     case 'join':
@@ -140,6 +142,8 @@ export function feedToJson(rows: FeedRow[], meta: { roomId: string; host?: strin
   const items = rows.map((r) => {
     const common = { at: localIso(r.tsMs), tsMs: r.tsMs, userId: r.viewer.userId, nickname: r.viewer.nickname ?? '', uniqueId: r.viewer.uniqueId ?? '', visits: r.visits, firstEver: r.firstEver };
     switch (r.k) {
+      case 'like':
+        return { kind: 'like', ...common, count: r.count };
       case 'comment':
         return { kind: 'comment', ...common, text: r.text };
       case 'join':

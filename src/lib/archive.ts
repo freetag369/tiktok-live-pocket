@@ -9,6 +9,8 @@ import { japaneseGiftName } from './gift-names';
  *  - 行は FeedRow に roomId を付けてそのまま保存する(画面の履歴や 🧹 とは無関係に全件)。
  *  - 配信(StreamRecord)は行を保存するたびに集計を更新する。同じ id の行を再保存しても
  *    二重に数えない(prev を見て差分だけ足す)ので、再接続・再起動・バックアップ取り込みに強い。
+ *  - いいねは (配信, 人, 1 分) ごとに 1 行(id が決まっている)。受信中は同じ行へ足し込み、
+ *    何度上書きしても rows は最初の 1 回しか増えない。
  */
 
 export interface StreamRecord {
@@ -107,6 +109,10 @@ export function sanitizeArchivedRow(raw: unknown): ArchivedRow | null {
   const firstEver = Boolean(r.firstEver);
   const common = { id: r.id, roomId: r.roomId, tsMs, viewer, visits, firstEver };
   switch (r.k) {
+    case 'like': {
+      const count = Math.floor(Number(r.count));
+      return Number.isFinite(count) && count > 0 ? { k: 'like', ...common, count } : null;
+    }
     case 'comment':
       return { k: 'comment', ...common, text: typeof r.text === 'string' ? r.text : '' };
     case 'join':

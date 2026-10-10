@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { MemoRecord } from '../lib/memos';
 import { filterArchiveRows, streamFileStem, streamHost, type StreamRecord } from '../lib/archive';
 import { feedToCsv, feedToJson } from '../lib/backup';
 import type { FeedRow, Tab } from '../lib/feed';
@@ -15,6 +16,7 @@ import { FeedRowView } from './FeedRow';
 
 interface Props {
   session: LiveSession;
+  memos: ReadonlyMap<string, MemoRecord>;
   settings: Settings;
   /** 受信中の roomId(「受信中」バッジ用)。デモ中は空。 */
   currentRoomId: string;
@@ -23,7 +25,7 @@ interface Props {
 
 const PAGE = 300;
 
-export function ArchiveSheet({ session, settings, currentRoomId, onClose }: Props) {
+export function ArchiveSheet({ memos, session, settings, currentRoomId, onClose }: Props) {
   const [streams, setStreams] = useState<StreamRecord[] | null>(null);
   const [open, setOpen] = useState<StreamRecord | null>(null);
 
@@ -36,6 +38,7 @@ export function ArchiveSheet({ session, settings, currentRoomId, onClose }: Prop
   if (open) {
     return (
       <StreamView
+        memos={memos}
         session={session}
         settings={settings}
         stream={open}
@@ -111,13 +114,14 @@ const TABS: Array<[Tab, string]> = [
 
 interface StreamProps {
   session: LiveSession;
+  memos: ReadonlyMap<string, MemoRecord>;
   settings: Settings;
   stream: StreamRecord;
   live: boolean;
   onBack: () => void;
 }
 
-function StreamView({ session, settings, stream, live, onBack }: StreamProps) {
+function StreamView({ memos, session, settings, stream, live, onBack }: StreamProps) {
   const [rows, setRows] = useState<FeedRow[] | null>(null);
   const [tab, setTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
@@ -230,7 +234,7 @@ function StreamView({ session, settings, stream, live, onBack }: StreamProps) {
           ) : filtered.length === 0 ? (
             <div className="empty">{query ? '一致する行がありません。' : 'この種類の行はありません。'}</div>
           ) : (
-            shown.map((r) => <FeedRowView key={r.id} row={r} showAvatars={settings.showAvatars} bigGiftDiamonds={settings.bigGiftDiamonds} />)
+            shown.map((r) => <FeedRowView key={r.id} row={r} note={memos.get(r.viewer.userId)?.note} previousNote={memos.get(r.viewer.userId)?.previousNote} kana={memos.get(r.viewer.userId)?.kana} showAvatars={settings.showAvatars} bigGiftDiamonds={settings.bigGiftDiamonds} />)
           )}
           {filtered.length > shown.length ? (
             <button className="btn more" onClick={() => setLimit((n) => n + PAGE)}>
