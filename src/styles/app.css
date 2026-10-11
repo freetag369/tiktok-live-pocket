@@ -129,6 +129,29 @@ img {
 .iconbtn:active {
   background: var(--bg-3);
 }
+/* ヘッダ右の 接続 / 切断(下のバーから移した分、フィードが縦に広がる) */
+.connbtn {
+  flex: none;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.connbtn.primary {
+  background: var(--accent);
+  color: #062a27;
+  border-color: var(--accent);
+}
+.connbtn:disabled {
+  opacity: 0.45;
+}
+.connbtn:active {
+  filter: brightness(1.15);
+}
 
 /* タブは 6 本 + 🧹。収まるときは均等、溢れたら横スクロール(🧹 は右端に貼り付く)。 */
 .tabs {
@@ -178,6 +201,23 @@ img {
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
+/* 本画面のタブ。入り切らない幅では横にスクロールし、🧹 は右端に残す。 */
+.tabs-scroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+.tabs-scroll button {
+  flex: 1 0 auto;
+  padding: 9px 6px;
+}
 
 .feed-wrap {
   flex: 1;
@@ -202,6 +242,94 @@ img {
   flex-direction: column;
   justify-content: flex-end;
   min-height: 100%;
+}
+/* 下に固定枠(.dock)があるタブでは、セーフエリアは枠側が持つ */
+.feed-wrap.docked .feed {
+  padding-bottom: 8px;
+}
+.feed-wrap.docked .newer {
+  bottom: 12px;
+}
+.feed-wrap.docked .like-toasts {
+  bottom: 56px;
+}
+
+/* ── 下の固定枠: 入室(入室 5 行ぶんの高さ) ───── */
+.dock {
+  --dock-row: calc(var(--fs-sm) * 1.3 + 12px);
+  --dock-rows: 5;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  padding-bottom: var(--safe-bottom);
+}
+.dock-title {
+  flex: none;
+  padding: 3px 12px 1px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg-faint);
+}
+.dock-title .n {
+  margin-left: 4px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.dock-list {
+  height: calc(var(--dock-row) * var(--dock-rows));
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.dock-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 100%;
+}
+.dock-empty {
+  margin: auto;
+  padding: 4px 12px;
+  text-align: center;
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+}
+/* 枠の行は 1 行固定(名前 + 回数 + 前回入室 + 時刻。メモは出さない。初見でも大きくしない) */
+.dock .row.join {
+  height: var(--dock-row);
+  padding: 0 12px;
+  align-items: center;
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  animation: none;
+}
+.dock .row.join.first {
+  font-size: var(--fs-sm);
+}
+.dock .row.join .avatar {
+  width: calc(var(--dock-row) - 10px);
+  height: calc(var(--dock-row) - 10px);
+}
+.dock .row.join .head {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  min-width: 0;
+}
+.dock .row.join .who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dock .row.join .badge {
+  flex: none;
+}
+.dock .row.join .prev {
+  flex: none;
+  color: var(--fg-dim);
+  font-size: var(--fs-xs);
 }
 .empty {
   margin: auto;
@@ -880,6 +1008,10 @@ img {
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
+.viewers-list .vrow .time {
+  max-width: 100%;
+  white-space: normal;
+}
 /* ── フォロー通知(上からスライドイン) ───────────────────── */
 .follow-toast {
   position: fixed;
@@ -1147,22 +1279,49 @@ img {
   background: var(--bg-1);
   border-bottom: 1px solid var(--line);
 }
-.person-head .prow-counts {
-  margin-top: 0;
-  font-size: var(--fs);
-}
-.person-likes {
-  margin-top: 4px;
+/* バッジ + 💬🎁❤️ の数(❤️ は最後の時刻つき)を 1 行に */
+.person-summary {
+  display: flex;
+  flex-wrap: nowrap; /* 必ず 1 行。入り切らなければ横にスクロール */
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  white-space: nowrap;
   font-size: var(--fs-sm);
-  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
 }
-.person-likes b {
-  color: var(--pink);
+.person-summary::-webkit-scrollbar {
+  display: none;
 }
-.person-likes small {
-  display: block;
+.person-summary > * {
+  flex: none;
+}
+/* 数の項目をバッジと同じ段に流す(数のまとまりごとに折り返さない) */
+.person-summary .prow-counts {
+  display: contents;
+}
+.person-summary .prow-counts > span {
+  flex: none;
+}
+/* 人物シートのコメント行。名前・アイコンは上に出ているので、時刻 + 本文だけ */
+.row.cline {
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 12px;
+}
+.row.cline time {
+  flex: none;
   color: var(--fg-faint);
   font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.row.cline .text {
+  margin-top: 0;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .person-head .memo-line {
   display: block;
@@ -1357,4 +1516,143 @@ img {
   font-size: var(--fs-xs);
   white-space: normal;
   overflow-wrap: anywhere;
+}
+/* ── ハイライト(日別のメンバー一覧) ─────────────────────── */
+.hl {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hl-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 8px 12px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+}
+.hl-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hl-date input {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px; /* iOS: 16px 未満だと入力時に自動ズームする */
+  color-scheme: dark;
+}
+.hl-today {
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.hl-sum {
+  margin-left: auto;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hl-demo {
+  flex: none;
+  padding: 6px 12px;
+  font-size: var(--fs-sm);
+  color: var(--violet);
+  background: rgba(169, 128, 255, 0.12);
+  border-bottom: 1px solid rgba(169, 128, 255, 0.3);
+}
+.hl-demo b {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--violet);
+  color: var(--bg);
+}
+.hl-note {
+  flex: none;
+  margin: 6px 12px;
+}
+.hl-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 8px calc(var(--safe-bottom) + 8px);
+}
+.hl-list .vrow {
+  flex: none;
+}
+.hl-list .more {
+  flex: none;
+  width: auto;
+  margin: 12px auto;
+  padding: 10px 18px;
+}
+.hl-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 3px;
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.hl-history {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.hl-history h2 {
+  margin: 0 0 6px;
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+}
+.hl-history h2 small {
+  margin-left: 4px;
+  color: var(--fg-faint);
+  font-weight: 400;
+}
+.hl-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--fs-sm);
+}
+.hl-entry time {
+  flex: none;
+  color: var(--fg-faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.hl-entry span {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hl-history .more {
+  width: auto;
+  margin: 10px auto 0;
+  padding: 9px 16px;
+}
+/* アーカイブの「すべて」に出る、いいね(1 分ごとにまとめた行) */
+.row.like {
+  color: var(--pink);
 }

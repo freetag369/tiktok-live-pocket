@@ -4,10 +4,12 @@ import { FeedList, type ScreenTab } from './components/FeedList';
 import { LikeRanking } from './components/LikeRanking';
 import { Interactions } from './components/Interactions';
 import { LikeToasts } from './components/LikeToasts';
+import { Highlights } from './components/Highlights';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
-import { countDataRows, type FeedRow } from './lib/feed';
+import { countDataRows, dockJoins, type FeedRow } from './lib/feed';
+import { JoinDock } from './components/JoinDock';
 import { FollowToast } from './components/FollowToast';
 import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
 import { ArchiveSheet } from './components/Archive';
@@ -16,6 +18,9 @@ import { LiveSession, type SessionSnapshot } from './lib/session';
 import { loadSettings, sanitize, saveSettings, type Settings } from './lib/settings';
 import { installWakeLockRefresh, setWakeLock } from './lib/wake-lock';
 import demoText from './fixtures/demo.ndjson?raw';
+
+/** 上のタブ。ハイライトは日別のメンバー一覧(行を流す画面ではない)。 */
+type AppTab = ScreenTab | 'highlights';
 
 function parseDemo(text: string): Array<{ o: number; type?: string; data?: unknown }> {
   return text
@@ -31,7 +36,9 @@ export function App() {
   const session = useMemo(() => new LiveSession(() => settingsRef.current), []);
 
   const [snap, setSnap] = useState<SessionSnapshot>(() => session.snapshot());
-  const [tab, setTab] = useState<ScreenTab>('all');
+  const [tab, setTab] = useState<AppTab>('all');
+  /** ハイライトで自分で選んだ日(null = 今日を追う)。タブを切り替えても残す。 */
+  const [highlightPick, setHighlightPick] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(() => !settings.hostUniqueId || !settings.eulerApiKey);
   const [showViewers, setShowViewers] = useState(false);
   const [memoTarget, setMemoTarget] = useState<MemoTarget | null>(null);
@@ -103,7 +110,11 @@ export function App() {
 
   const f = snap.feed;
   const hasRows = f.rows.some((r) => r.k !== 'room');
-  const tabs: Array<[ScreenTab, string, number | null]> = [
+  // 下の固定枠(入室)。「すべて」「コメント」タブに出し、そこでは上のフィードに入室を流さない。
+  const dockTab = tab === 'all' || tab === 'comment' ? tab : null;
+  const docked = dockTab !== null;
+  const dockRows = useMemo(() => (dockTab ? dockJoins(f.rows, dockTab) : []), [dockTab, f.rows]);
+  const tabs: Array<[AppTab, string, number | null]> = [
     ['all', 'すべて', null],
     ['comment', 'コメント', f.commentCount],
     ['join', '入室', f.joinCount],
@@ -111,6 +122,7 @@ export function App() {
     ['like', 'いいね', f.likeCount],
     // 人数は出さない(snapshot ごとに全行を数えないため。幅の節約にもなる)
     ['people', 'やり取り', null],
+    ['highlights', 'ハイライト', null],
   ];
   const emptyText =
     connected || snap.demo ? (
@@ -121,7 +133,7 @@ export function App() {
       </>
     ) : canConnect ? (
       <>
-        下の <b>接続</b> を押すと受信を始めます。
+        右上の <b>接続</b> を押すと受信を始めます。
       </>
     ) : (
       <>
@@ -131,7 +143,18 @@ export function App() {
 
   return (
     <div className="app">
-      <Header socket={snap.socket} room={snap.room} hostUniqueId={settings.hostUniqueId} diamonds={f.diamonds} demo={snap.demo} onSettings={() => setShowSettings(true)} onArchive={() => setShowArchive(true)} />
+      <Header
+        socket={snap.socket}
+        room={snap.room}
+        hostUniqueId={settings.hostUniqueId}
+        diamonds={f.diamonds}
+        demo={snap.demo}
+        connected={connected}
+        canConnect={canConnect}
+        onToggleConnect={toggleConnect}
+        onSettings={() => setShowSettings(true)}
+        onArchive={() => setShowArchive(true)}
+      />
       {toast && settings.followPopup ? <FollowToast toast={toast} showAvatars={settings.showAvatars} onDone={dismissToast} /> : null}
       {snap.socket.s === 'error' ? (
         <div className="banner">
@@ -145,12 +168,22 @@ export function App() {
         </div>
       ) : null}
       <nav className="tabs">
-        {tabs.map(([k, label, n]) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
-            {label}
-            {n != null && n > 0 ? <span className="n">{compact(n)}</span> : null}
-          </button>
-        ))}
+        {/* 幅が足りない iPhone では横にスクロールする(🧹 は右端に残す) */}
+        <div className="tabs-scroll">
+          {tabs.map(([k, label, n]) => (
+            <button
+              key={k}
+              className={tab === k ? 'on' : ''}
+              onClick={(e) => {
+                setTab(k);
+                e.currentTarget.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+              }}
+            >
+              {label}
+              {n != null && n > 0 ? <span className="n">{compact(n)}</span> : null}
+            </button>
+          ))}
+        </div>
         <button className="tab-reset" aria-label="画面の履歴をリセット" disabled={!hasRows} onClick={() => setConfirmClear((c) => !c)}>
           🧹
         </button>
@@ -202,8 +235,19 @@ export function App() {
           showAvatars={settings.showAvatars}
           empty={connected || snap.demo ? <>まだいいねが届いていません。</> : emptyText}
         />
+      ) : tab === 'highlights' ? (
+        <Highlights
+          session={session}
+          generation={snap.archiveGeneration}
+          demo={snap.demo}
+          memos={snap.highlightMemos}
+          picked={highlightPick}
+          onPick={setHighlightPick}
+          showAvatars={settings.showAvatars}
+          archiveEnabled={settings.archiveEnabled}
+        />
       ) : (
-        <div className="feed-wrap">
+        <div className={`feed-wrap${docked ? ' docked' : ''}`}>
           <FeedList
             key={`${tab}:${snap.screenEpoch}`}
             rows={f.rows}
@@ -213,16 +257,13 @@ export function App() {
             memos={snap.memos}
             onTapRow={onTapRow}
             previousJoinedFor={session.previousJoinedFor}
+            docked={docked}
             empty={emptyText}
           />
           {settings.likePopup ? <LikeToasts likes={f.likes} likeCount={f.likeCount} showAvatars={settings.showAvatars} /> : null}
         </div>
       )}
-      <div style={{ flex: 'none', padding: '8px 12px calc(var(--safe-bottom) + 8px)', background: 'var(--bg-1)', borderTop: '1px solid var(--line)' }}>
-        <button className={`btn ${connected ? '' : 'primary'}`} style={{ margin: 0 }} disabled={!connected && !canConnect} onClick={toggleConnect}>
-          {connected ? '切断' : snap.demo ? 'デモを止めて接続' : '接続'}
-        </button>
-      </div>
+      {docked ? <JoinDock rows={dockRows} showAvatars={settings.showAvatars} memos={snap.memos} previousJoinedFor={session.previousJoinedFor} onTapRow={onTapRow} /> : null}
       {showArchive ? <ArchiveSheet memos={snap.archiveMemos} session={session} settings={settings} currentRoomId={snap.demo ? '' : snap.room.roomId} onClose={() => setShowArchive(false)} /> : null}
       {showSettings ? (
         <SettingsSheet

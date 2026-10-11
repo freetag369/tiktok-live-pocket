@@ -142,7 +142,7 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
 
         <div className="section">
           <h2>アーカイブ</h2>
-          <p className="note">受信したコメント・入室・ギフトを配信ごとに残し、右上の 🗂 から見返せます。画面を 🧹 でリセットしても、こちらは消えません。</p>
+          <p className="note">受信したコメント・入室・いいね・フォロー・ギフトを配信ごとに残し、右上の 🗂 から見返せます。ハイライトの日別の履歴もここから読みます。画面を 🧹 でリセットしても、こちらは消えません。</p>
           <div className="field">
             <label>
               アーカイブを残す

@@ -12,6 +12,8 @@ import { idStr, numOr, pickUrl, str, toMs } from './ids';
  *   コメント     v2 data.comment           v3 data.content
  *   ギフト詳細   v2 data.giftDetails.{giftName,giftType,giftImage}   v3 data.gift.{name,type,icon}
  *   repeatEnd    どちらも「数値」(0/1)。boolean 比較は常に偽になる罠。
+ *   social キー  v2 common.displayText.displayType   v3 common.displayText.key
+ *                (follow = pm_main_follow_message_viewer_2 / share = pm_mt_guidance_share / リポスト = ttlive_repost_…)
  *   エモート     ChatMessage.emotes[]{placeInComment, emote.emoteId}。スタンプだけなら comment は ' '。表示しない。
  *
  * ギフターレベル(バッジ)持ちの入室は MemberMessage ではなく WebcastBarrageMessage(帯メッセージ)で届く。
@@ -195,8 +197,14 @@ function normalizeOne(type: string, raw: unknown, now: number): NormalizedEvent 
     case 'WebcastSocialMessage': {
       const v = viewerOf(data.user);
       if (!v) return null;
-      const key = str(data?.common?.displayText?.key).toLowerCase();
-      const sub: 'follow' | 'share' | 'other' = key.includes('follow') ? 'follow' : key.includes('share') ? 'share' : 'other';
+      // v2(Euler)は displayType、v3(tiktok-live-connector)は key に同じ i18n キーが入る。
+      const text = data?.common?.displayText;
+      const key = (str(text?.key) || str(text?.displayType)).toLowerCase();
+      const sub: 'follow' | 'share' | 'other' = key.includes('follow')
+        ? 'follow'
+        : key.includes('share') || key.includes('repost')
+          ? 'share'
+          : 'other';
       const tsMs = tsOf(data, now);
       return { kind: 'social', msgId: msgIdOf(data, 'social', v.userId, tsMs, sub), tsMs, viewer: v, sub };
     }

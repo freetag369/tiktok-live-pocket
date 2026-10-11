@@ -1,4 +1,5 @@
 import type { GiftCatalogRecord } from './db';
+import { japaneseGiftName } from './gift-names';
 import type { FeedRow } from './feed';
 import { sanitize, type Settings } from './settings';
 import { sanitizeRecord, type VisitRecord } from './visits';
@@ -117,6 +118,8 @@ export function rowToCsvFields(r: FeedRow): string[] {
   const who = [r.viewer.nickname ?? '', r.viewer.uniqueId ? `@${r.viewer.uniqueId}` : ''];
   const tail = [String(r.visits), r.firstEver ? '1' : '0'];
   switch (r.k) {
+    case 'like':
+      return [...base, 'いいね', ...who, '', '', String(r.count), '', ...tail];
     case 'comment':
       return [...base, 'コメント', ...who, r.text, '', '', '', ...tail];
     case 'join':
@@ -124,7 +127,7 @@ export function rowToCsvFields(r: FeedRow): string[] {
     case 'social':
       return [...base, r.sub === 'follow' ? 'フォロー' : 'シェア', ...who, '', '', '', '', ...tail];
     case 'gift':
-      return [...base, 'ギフト', ...who, r.giftName, r.giftId, String(r.count), String(r.diamonds), ...tail];
+      return [...base, 'ギフト', ...who, japaneseGiftName(r.giftName, r.giftId), r.giftId, String(r.count), String(r.diamonds), ...tail];
   }
 }
 
@@ -139,6 +142,8 @@ export function feedToJson(rows: FeedRow[], meta: { roomId: string; host?: strin
   const items = rows.map((r) => {
     const common = { at: localIso(r.tsMs), tsMs: r.tsMs, userId: r.viewer.userId, nickname: r.viewer.nickname ?? '', uniqueId: r.viewer.uniqueId ?? '', visits: r.visits, firstEver: r.firstEver };
     switch (r.k) {
+      case 'like':
+        return { kind: 'like', ...common, count: r.count };
       case 'comment':
         return { kind: 'comment', ...common, text: r.text };
       case 'join':

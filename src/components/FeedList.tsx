@@ -23,6 +23,8 @@ interface Props {
   memos: ReadonlyMap<string, MemoRecord>;
   onTapRow?: (row: FeedRow) => void;
   previousJoinedFor?: (userId: string) => number | undefined;
+  /** 下の固定枠(JoinDock)が入室を出しているタブでは、上のフィードに入室を流さない。 */
+  docked?: boolean;
 }
 
 /** 追従を止めている間の窓。止めた時の行をそのまま保ち、新着は下に少しだけ足す。 */
@@ -81,7 +83,7 @@ function topRow(el: HTMLElement): { id: string; top: number } | null {
  * 「↓ 新着 N 件」で戻る(既存 PC アプリの見逃し防止と同じ思想)。
  * 追従を止めている間は表示中の行を動かさない(上限で落ちた入室も消さない)ので、画面が跳ねない。
  */
-export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos, onTapRow, previousJoinedFor }: Props) {
+export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos, onTapRow, previousJoinedFor, docked }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pinned, setPinned] = useState(true);
   const pinnedRef = useRef(true);
@@ -91,7 +93,8 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
   const anchor = useRef<{ id: string; top: number } | null>(null);
   const [, bump] = useState(0);
 
-  const items = useMemo(() => filterRows(rows, tab), [rows, tab]);
+  // 枠のあるタブでは入室を上に並べず、下の固定枠(JoinDock)に出す。
+  const items = useMemo(() => filterRows(rows, tab, { dropJoins: !!docked }), [rows, tab, docked]);
   // 「前回」メモは、その配信でその人が最初に現れた行にだけ出す(毎行は出さない)。
   const firstIds = useMemo(() => firstRowsPerRoom(items), [items]);
 

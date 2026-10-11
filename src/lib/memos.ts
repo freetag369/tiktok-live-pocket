@@ -114,6 +114,15 @@ export class MemoBook {
   }
 
   /**
+   * 読込が終わる前に仮の帳(early)へ書いたメモを、読み込んだ帳に移す(保存はこの後の保存で)。
+   * 仮の帳は空から始まるので、そこでの削除は「仮の帳で書いて消した」だけ。保存済みのメモは消さない。
+   */
+  adopt(early: MemoBook): void {
+    const { put } = early.drainDirty();
+    for (const r of put) this.set(r.userId, r, r.updatedMs);
+  }
+
+  /**
    * バックアップの取り込み。
    *  - merge:   userId ごとに updatedMs の新しい方を採用
    *  - replace: いまのメモを捨てて置き換える

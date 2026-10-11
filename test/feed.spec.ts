@@ -10,6 +10,8 @@ import {
   FEED_KEEP_JOINS,
   filterRows,
   firstRowsPerRoom,
+  dockJoins,
+  isJoinRow,
   JOIN_DEDUPE_MS,
   reconcileWindow,
   restoreFeed,
@@ -289,6 +291,40 @@ describe('タブと配信の区切り(filterRows)', () => {
     expect(filterRows(s.rows, 'comment').map((r) => r.k)).toEqual(['comment', 'room']);
     expect(filterRows(s.rows, 'join').map((r) => r.k)).toEqual(['room', 'join']);
     expect(filterRows(s.rows, 'gift')).toEqual([]);
+  });
+
+  it('入室は dropJoins で上から外れ、dockJoins が末尾から拾う(すべて・コメントタブだけ)', () => {
+    let s = createFeedState();
+    s = enterRoom(s, 'r1', { now: NOW });
+    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1', nickname: 'たろう' }, action: 1 }, meta);
+    s = applyEvent(s, { kind: 'join', msgId: 'j2', tsMs: NOW + 2, viewer: { userId: 'u2', uniqueId: 'handle_only' }, action: 1 }, meta);
+    s = applyEvent(s, { kind: 'join', msgId: 'j3', tsMs: NOW + 3, viewer: { userId: 'u3', nickname: 'user28420669859' }, action: 1 }, meta);
+    s = applyEvent(s, comment('c1', 'hi', 'u4'), meta);
+    s = applyEvent(s, { kind: 'social', msgId: 's1', tsMs: NOW + 5, viewer: { userId: 'u5' }, sub: 'follow' }, meta);
+    expect(s.rows.filter(isJoinRow).map((r) => r.id)).toEqual(['j1', 'j2', 'j3']);
+    // 入室の件数は今まで通り(表示先が変わるだけ)
+    expect(s.joinCount).toBe(3);
+
+    // 名前の有無に関係なく、入室は全部外れる(フォローは残る)
+    expect(filterRows(s.rows, 'all', { dropJoins: true }).map((r) => r.id)).toEqual(['c1', 's1']);
+    expect(filterRows(s.rows, 'comment', { dropJoins: true }).map((r) => r.id)).toEqual(['c1']);
+    // 入室タブ(枠なし)と既定(アーカイブ)は外さない
+    expect(filterRows(s.rows, 'join').map((r) => r.id)).toEqual(['j1', 'j2', 'j3', 's1']);
+    expect(filterRows(s.rows, 'all').map((r) => r.id)).toEqual(['j1', 'j2', 'j3', 'c1', 's1']);
+
+    expect(dockJoins(s.rows, 'all').map((r) => r.id)).toEqual(['j1', 'j2', 'j3']);
+    expect(dockJoins(s.rows, 'comment').map((r) => r.id)).toEqual(['j1', 'j2', 'j3']);
+    expect(dockJoins(s.rows, 'all', 1).map((r) => r.id)).toEqual(['j3']);
+    expect(dockJoins(s.rows, 'join')).toEqual([]);
+    expect(dockJoins(s.rows, 'gift')).toEqual([]);
+  });
+
+  it('入室しか無いタブは上が空(「まだ何も届いていません」)になり、枠には出る', () => {
+    let s = createFeedState();
+    s = enterRoom(s, 'r1', { now: NOW });
+    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1', nickname: 'たろう' }, action: 1 }, meta);
+    expect(filterRows(s.rows, 'all', { dropJoins: true })).toEqual([]);
+    expect(dockJoins(s.rows, 'all')).toHaveLength(1);
   });
 });
 

@@ -46,6 +46,20 @@ export type FeedRow =
       sub: 'follow' | 'share' | 'other';
       visits: number;
       firstEver: boolean;
+    }
+  | {
+      /**
+       * いいね(配信・人・1 分ごとに 1 行へまとめたもの。id は `like:<roomId>:<userId>:<分の頭>`)。
+       * アーカイブとハイライト専用。applyEvent は作らず(いいねは likes で集計)、画面の行・画面の履歴には入らない。
+       */
+      k: 'like';
+      id: string;
+      tsMs: number;
+      viewer: Viewer;
+      /** その 1 分に受け取ったタップ数の合計。 */
+      count: number;
+      visits: number;
+      firstEver: boolean;
     };
 
 /** 配信の境目(「── 新しい配信 ──」)。行ではないので書き出し・アーカイブには入らない。 */
@@ -85,7 +99,10 @@ export interface FeedState {
   likeCount: number;
   /** TikTok が送ってくる部屋全体の累計いいね(接続前の分も含む)。見た中の最大値。 */
   likeRoomTotal?: number;
-  /** 直近の applyEvent で作成または更新した行(アーカイブ・画面の履歴の保存用)。state が変わらなければ触らない。 */
+  /**
+   * 直近の applyEvent で作成または更新した行(アーカイブ・画面の履歴の保存用)。state が変わらなければ触らない。
+   * いいねは行を作らないので null(アーカイブ用のいいね行は session が 1 分ごとにまとめて作る)。
+   */
   lastTouched: FeedRow | null;
 }
 
@@ -332,11 +349,22 @@ function inTab(r: FeedRow, tab: Tab): boolean {
   }
 }
 
+export type JoinRow = Extract<FeedRow, { k: 'join' }>;
+
+export function isJoinRow(i: FeedItem): i is JoinRow {
+  return i.k === 'join';
+}
+
+export interface FilterOptions {
+  /** 入室の行を外す(本画面用。下の固定枠が入室をまとめて出すので、上には並べない)。 */
+  dropJoins?: boolean;
+}
+
 /**
  * タブで絞る。配信の区切りは全タブに残すが、続けて並んだ区切りは後ろだけにし、
  * その種類の行が 1 つも無ければ空にする(「まだ何も届いていません」を出すため)。
  */
-export function filterRows<T extends FeedItem>(items: T[], tab: Tab): T[] {
+export function filterRows<T extends FeedItem>(items: T[], tab: Tab, opts?: FilterOptions): T[] {
   const out: T[] = [];
   let rows = 0;
   for (const i of items) {
@@ -347,11 +375,31 @@ export function filterRows<T extends FeedItem>(items: T[], tab: Tab): T[] {
       continue;
     }
     if (!inTab(i, tab)) continue;
+    if (opts?.dropJoins && i.k === 'join') continue;
     out.push(i);
     rows++;
   }
   if (rows === 0) return [];
   return out.length === items.length ? items : out;
+}
+
+/** 下の固定枠を出すタブ(すべて・コメント)。入室タブは上のフィードに入室を流すので枠は出さない。 */
+function isDockTab(tab: Tab): boolean {
+  return tab === 'all' || tab === 'comment';
+}
+
+/** 下の固定枠に持つ行数(枠の見た目は 5 行。それより前は枠の中を上へスクロールして見る)。 */
+export const JOIN_DOCK_KEEP = 50;
+
+/** 下の固定枠に出す行: 入室の末尾 limit 件(古い順)。枠を出さないタブでは空。 */
+export function dockJoins(items: FeedItem[], tab: Tab, limit = JOIN_DOCK_KEEP): JoinRow[] {
+  if (!isDockTab(tab)) return [];
+  const out: JoinRow[] = [];
+  for (let i = items.length - 1; i >= 0 && out.length < limit; i--) {
+    const it = items[i]!;
+    if (isJoinRow(it)) out.push(it);
+  }
+  return out.reverse();
 }
 
 /**
