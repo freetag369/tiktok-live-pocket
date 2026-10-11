@@ -84,6 +84,13 @@ at(12000, 'WebcastGiftMessage', { common: common(12000), user: user(users[1]), g
 like(12300, users[1], 3, 157);
 at(12700, 'WebcastChatMessage', { common: common(12700), user: user(users[0]), content: 'えっギャラクシー！？すごい' });
 at(13300, 'WebcastSocialMessage', { common: { ...common(13300), displayText: { key: 'pm_mt_guidance_share' } }, user: user(users[5]) });
+// スタンプ(サブスクエモート)だけのコメント。実配信では content が ' ' で届き、画像は emotes[] に入る。表示しない。
+at(13600, 'WebcastChatMessage', {
+  common: common(13600),
+  user: user(users[0]),
+  content: ' ',
+  emotes: [{ placeInComment: 0, emote: { emoteId: '7100000000000000001', image: { urlList: ['https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/emote-demo.png'] } } }],
+});
 at(14000, 'WebcastChatMessage', { common: common(14000), user: user(users[4]), content: 'また来ます〜👋' });
 
 writeFileSync(out, lines.map((l) => JSON.stringify(l)).join('\n') + '\n', 'utf8');

@@ -12,6 +12,7 @@ import { idStr, numOr, pickUrl, str, toMs } from './ids';
  *   コメント     v2 data.comment           v3 data.content
  *   ギフト詳細   v2 data.giftDetails.{giftName,giftType,giftImage}   v3 data.gift.{name,type,icon}
  *   repeatEnd    どちらも「数値」(0/1)。boolean 比較は常に偽になる罠。
+ *   エモート     ChatMessage.emotes[]{placeInComment, emote.emoteId}。スタンプだけなら comment は ' '。表示しない。
  *
  * ギフターレベル(バッジ)持ちの入室は MemberMessage ではなく WebcastBarrageMessage(帯メッセージ)で届く。
  *   種別   msgType 9 = GRADE_USER_ENTRANCE_NOTIFICATION / 11 = FANS_LEVEL_ENTRANCE / 15 = ENIGMA_ENTRANCE
@@ -132,9 +133,16 @@ function normalizeOne(type: string, raw: unknown, now: number): NormalizedEvent 
       const v = viewerOf(data.user, data.userIdentity);
       if (!v) return null;
       const content = str(data.comment ?? data.content);
+      // エモート(サブスクのスタンプ)は表示しない。スタンプだけのコメントは本文が ' ' で届き、
+      // 画像は emotes[] に入る(実配信で確認)。文字が無ければ行にしない。文字+スタンプは文字だけ出す。
+      if (!content.trim()) return null;
       const tsMs = tsOf(data, now);
       return { kind: 'comment', msgId: msgIdOf(data, 'chat', v.userId, tsMs, content), tsMs, viewer: v, content };
     }
+
+    case 'WebcastEmoteChatMessage':
+      // エモート専用メッセージ(ライブラリ定義)。実配信ではチャット添付で届くが、どちらでも表示しない。
+      return null;
 
     case 'WebcastLikeMessage': {
       const v = viewerOf(data.user);
