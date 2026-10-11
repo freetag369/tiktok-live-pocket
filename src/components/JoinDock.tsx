@@ -6,7 +6,7 @@ import { Avatar } from './Avatar';
 import { GradeBadge, VisitBadge } from './Badges';
 
 /** 枠の見た目の行数(CSS の --dock-rows と合わせる)。 */
-export const DOCK_ROWS = 3;
+export const DOCK_ROWS = 5;
 
 interface Props {
   /** 入室(古い順)。feed.ts の dockJoins で絞ったもの。 */
@@ -26,7 +26,7 @@ export function dockLabel(v: JoinRow['viewer']): string {
 
 /**
  * 画面の一番下に固定する「入室」の枠。すべて・コメントタブに出す。
- * 上のフィードとは別の固定カテゴリで、高さは入室 3 行ぶん。新着は下に積まれ、古い分は枠の中を上へスクロールして見る。
+ * 上のフィードとは別の固定カテゴリで、高さは入室 5 行ぶん。新着は下に積まれ、古い分は枠の中を上へスクロールして見る。
  * 行はコンパクト(1 行)にして、名前・回数(初見)・前回入室・時刻だけ出す(タップでメモのシートが開く)。
  */
 export function JoinDock({ rows, showAvatars, memos, previousJoinedFor, onTapRow }: Props) {

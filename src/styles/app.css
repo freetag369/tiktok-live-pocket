@@ -254,10 +254,10 @@ img {
   bottom: 56px;
 }
 
-/* ── 下の固定枠: 入室(入室 3 行ぶんの高さ) ───── */
+/* ── 下の固定枠: 入室(入室 5 行ぶんの高さ) ───── */
 .dock {
   --dock-row: calc(var(--fs-sm) * 1.3 + 12px);
-  --dock-rows: 3;
+  --dock-rows: 5;
   flex: none;
   display: flex;
   flex-direction: column;

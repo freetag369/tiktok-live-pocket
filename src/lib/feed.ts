@@ -388,7 +388,7 @@ function isDockTab(tab: Tab): boolean {
   return tab === 'all' || tab === 'comment';
 }
 
-/** 下の固定枠に持つ行数(枠の見た目は 3 行。それより前は枠の中を上へスクロールして見る)。 */
+/** 下の固定枠に持つ行数(枠の見た目は 5 行。それより前は枠の中を上へスクロールして見る)。 */
 export const JOIN_DOCK_KEEP = 50;
 
 /** 下の固定枠に出す行: 入室の末尾 limit 件(古い順)。枠を出さないタブでは空。 */
