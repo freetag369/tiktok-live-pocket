@@ -8,7 +8,8 @@ import { Highlights } from './components/Highlights';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
-import { countDataRows, type FeedRow } from './lib/feed';
+import { countDataRows, namelessJoins, type FeedRow } from './lib/feed';
+import { NamelessDock } from './components/NamelessDock';
 import { FollowToast } from './components/FollowToast';
 import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
 import { ArchiveSheet } from './components/Archive';
@@ -109,6 +110,10 @@ export function App() {
 
   const f = snap.feed;
   const hasRows = f.rows.some((r) => r.k !== 'room');
+  // 下の固定枠(ニックネームなしの入室)。入室が流れる「すべて」「入室」タブだけに出す。
+  const dockTab = tab === 'all' || tab === 'join' ? tab : null;
+  const docked = dockTab !== null;
+  const dockRows = useMemo(() => (dockTab ? namelessJoins(f.rows, dockTab) : []), [dockTab, f.rows]);
   const tabs: Array<[AppTab, string, number | null]> = [
     ['all', 'すべて', null],
     ['comment', 'コメント', f.commentCount],
@@ -128,7 +133,7 @@ export function App() {
       </>
     ) : canConnect ? (
       <>
-        下の <b>接続</b> を押すと受信を始めます。
+        右上の <b>接続</b> を押すと受信を始めます。
       </>
     ) : (
       <>
@@ -138,7 +143,18 @@ export function App() {
 
   return (
     <div className="app">
-      <Header socket={snap.socket} room={snap.room} hostUniqueId={settings.hostUniqueId} diamonds={f.diamonds} demo={snap.demo} onSettings={() => setShowSettings(true)} onArchive={() => setShowArchive(true)} />
+      <Header
+        socket={snap.socket}
+        room={snap.room}
+        hostUniqueId={settings.hostUniqueId}
+        diamonds={f.diamonds}
+        demo={snap.demo}
+        connected={connected}
+        canConnect={canConnect}
+        onToggleConnect={toggleConnect}
+        onSettings={() => setShowSettings(true)}
+        onArchive={() => setShowArchive(true)}
+      />
       {toast && settings.followPopup ? <FollowToast toast={toast} showAvatars={settings.showAvatars} onDone={dismissToast} /> : null}
       {snap.socket.s === 'error' ? (
         <div className="banner">
@@ -231,7 +247,7 @@ export function App() {
           archiveEnabled={settings.archiveEnabled}
         />
       ) : (
-        <div className="feed-wrap">
+        <div className={`feed-wrap${docked ? ' docked' : ''}`}>
           <FeedList
             key={`${tab}:${snap.screenEpoch}`}
             rows={f.rows}
@@ -246,11 +262,7 @@ export function App() {
           {settings.likePopup ? <LikeToasts likes={f.likes} likeCount={f.likeCount} showAvatars={settings.showAvatars} /> : null}
         </div>
       )}
-      <div style={{ flex: 'none', padding: '8px 12px calc(var(--safe-bottom) + 8px)', background: 'var(--bg-1)', borderTop: '1px solid var(--line)' }}>
-        <button className={`btn ${connected ? '' : 'primary'}`} style={{ margin: 0 }} disabled={!connected && !canConnect} onClick={toggleConnect}>
-          {connected ? '切断' : snap.demo ? 'デモを止めて接続' : '接続'}
-        </button>
-      </div>
+      {docked ? <NamelessDock rows={dockRows} showAvatars={settings.showAvatars} memos={snap.memos} onTapRow={onTapRow} /> : null}
       {showArchive ? <ArchiveSheet memos={snap.archiveMemos} session={session} settings={settings} currentRoomId={snap.demo ? '' : snap.room.roomId} onClose={() => setShowArchive(false)} /> : null}
       {showSettings ? (
         <SettingsSheet

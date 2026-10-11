@@ -9,7 +9,9 @@ import {
   enterRoom,
   FEED_KEEP_JOINS,
   filterRows,
+  isNamelessJoin,
   JOIN_DEDUPE_MS,
+  namelessJoins,
   reconcileWindow,
   restoreFeed,
   tailWindow,
@@ -288,6 +290,36 @@ describe('タブと配信の区切り(filterRows)', () => {
     expect(filterRows(s.rows, 'comment').map((r) => r.k)).toEqual(['comment', 'room']);
     expect(filterRows(s.rows, 'join').map((r) => r.k)).toEqual(['room', 'join']);
     expect(filterRows(s.rows, 'gift')).toEqual([]);
+  });
+
+  it('ニックネームの無い入室は dropNameless で上から外れ、namelessJoins が末尾から拾う', () => {
+    let s = createFeedState();
+    s = enterRoom(s, 'r1', { now: NOW });
+    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1', nickname: 'たろう' }, action: 1 }, meta);
+    s = applyEvent(s, { kind: 'join', msgId: 'j2', tsMs: NOW + 2, viewer: { userId: 'u2', uniqueId: 'handle_only' }, action: 1 }, meta);
+    s = applyEvent(s, { kind: 'join', msgId: 'j3', tsMs: NOW + 3, viewer: { userId: 'u3', nickname: '  ' }, action: 1 }, meta);
+    s = applyEvent(s, comment('c1', 'hi', 'u4'), meta);
+    expect(s.rows.filter(isNamelessJoin).map((r) => r.id)).toEqual(['j2', 'j3']);
+    // 入室の件数は今まで通り(表示先が変わるだけ)
+    expect(s.joinCount).toBe(3);
+
+    expect(filterRows(s.rows, 'all', { dropNameless: true }).map((r) => r.id)).toEqual(['j1', 'c1']);
+    expect(filterRows(s.rows, 'join', { dropNameless: true }).map((r) => r.id)).toEqual(['j1']);
+    // 既定(アーカイブ)は外さない
+    expect(filterRows(s.rows, 'join').map((r) => r.id)).toEqual(['j1', 'j2', 'j3']);
+
+    expect(namelessJoins(s.rows, 'all').map((r) => r.id)).toEqual(['j2', 'j3']);
+    expect(namelessJoins(s.rows, 'join', 1).map((r) => r.id)).toEqual(['j3']);
+    expect(namelessJoins(s.rows, 'comment')).toEqual([]);
+    expect(namelessJoins(s.rows, 'gift')).toEqual([]);
+  });
+
+  it('ニックネーム無しの入室しか無いタブは上が空(「まだ何も届いていません」)になる', () => {
+    let s = createFeedState();
+    s = enterRoom(s, 'r1', { now: NOW });
+    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1' }, action: 1 }, meta);
+    expect(filterRows(s.rows, 'join', { dropNameless: true })).toEqual([]);
+    expect(namelessJoins(s.rows, 'join')).toHaveLength(1);
   });
 });
 

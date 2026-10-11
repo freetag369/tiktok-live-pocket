@@ -17,6 +17,8 @@ const users = [
   { id: '5', displayId: 'yuna_yy', nickname: 'ゆな' },
   { id: '6', displayId: 'daichi88', nickname: 'だいち' },
   { id: '7', displayId: 'ao_ao', nickname: 'あお' },
+  // ニックネームが無い入室者(@ハンドルだけで届く)。本画面では下の固定枠に出る
+  { id: '8', displayId: 'user8821930', nickname: '' },
 ];
 const user = (u) => ({
   id: u.id,
@@ -58,6 +60,7 @@ for (const [i, n] of [1, 3, 5, 8].entries()) {
   at(4000 + i * 350, 'WebcastGiftMessage', { common: common(4000 + i * 350), user: user(users[2]), giftId: '5655', repeatCount: n, repeatEnd: i === 3 ? 1 : 0, groupId: 'grp-rose-1', gift: gifts.rose });
 }
 at(5600, 'WebcastMemberMessage', { common: common(5600), user: user(users[4]), action: 1 });
+at(5750, 'WebcastMemberMessage', { common: common(5750), user: user(users[7]), action: 1 });
 like(5900, users[4], 4, 131);
 like(6300, users[4], 6, 137);
 at(6100, 'WebcastChatMessage', { common: common(6100), user: user(users[2]), content: 'バラ送ったよ〜🌹' });
