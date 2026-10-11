@@ -1172,22 +1172,36 @@ img {
   background: var(--bg-1);
   border-bottom: 1px solid var(--line);
 }
-.person-head .prow-counts {
-  margin-top: 0;
+/* バッジ + 💬🎁❤️ の数(❤️ は最後の時刻つき)を 1 行に */
+.person-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
   font-size: var(--fs);
+  font-variant-numeric: tabular-nums;
 }
-.person-likes {
-  margin-top: 4px;
-  font-size: var(--fs-sm);
-  color: var(--fg-dim);
+/* 数の項目をバッジと同じ段に流す(数のまとまりごとに折り返さない) */
+.person-summary .prow-counts {
+  display: contents;
 }
-.person-likes b {
-  color: var(--pink);
+/* 人物シートのコメント行。名前・アイコンは上に出ているので、時刻 + 本文だけ */
+.row.cline {
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 12px;
 }
-.person-likes small {
-  display: block;
+.row.cline time {
+  flex: none;
   color: var(--fg-faint);
   font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.row.cline .text {
+  margin-top: 0;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .person-head .memo-line {
   display: block;
