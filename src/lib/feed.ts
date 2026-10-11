@@ -403,6 +403,28 @@ export function dockJoins(items: FeedItem[], tab: Tab, limit = JOIN_DOCK_KEEP): 
 }
 
 /**
+ * 配信区間(区切り `room` ごと)で、各人が最初に現れた行の id。
+ * 「前回」メモはこの行にだけ出す(同じ人の 2 行目以降には出さない)。
+ * タブで絞った後の items に対して使うので、そのタブで最初に見える行が対象になる。
+ * 連打ギフトは同じ id の行を更新するだけなので、最初の行のまま。
+ */
+export function firstRowsPerRoom(items: FeedItem[]): ReadonlySet<string> {
+  const out = new Set<string>();
+  let seen = new Set<string>();
+  for (const i of items) {
+    if (i.k === 'room') {
+      seen = new Set();
+      continue;
+    }
+    const id = i.viewer.userId;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.add(i.id);
+  }
+  return out;
+}
+
+/**
  * 配信が変わったときに呼ぶ。同じ配信・まだ未確定なら採用するだけ(再起動後の続き)。
  * 別の配信なら区切りを積み、集計・重複表をリセットする(行は残す)。
  */

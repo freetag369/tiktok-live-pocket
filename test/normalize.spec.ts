@@ -32,6 +32,15 @@ describe('normalize (v2 = Euler Cloud WebSocket)', () => {
     expect(e!.tsMs).toBe(1785240000 * 1000);
   });
 
+  it('chat: エモート(スタンプ)は表示しない — スタンプだけは null、文字付きは文字だけ', () => {
+    const emotes = [{ placeInComment: 0, emote: { emoteId: '7100000000000000001', image: { url: ['https://p16.tiktokcdn.com/emote.png'] } } }];
+    // 実配信ではスタンプだけのコメントは comment が ' ' で届く。
+    expect(normalize('WebcastChatMessage', { common: { msgId: '12' }, user: v2User, comment: ' ', emotes }, NOW)).toBeNull();
+    expect(normalize('WebcastChatMessage', { common: { msgId: '13' }, user: v2User, comment: '', emotes }, NOW)).toBeNull();
+    expect(normalize('WebcastEmoteChatMessage', { common: { msgId: '14' }, user: v2User, emoteList: [emotes[0]!.emote] }, NOW)).toBeNull();
+    expect(normalize('WebcastChatMessage', { common: { msgId: '15' }, user: v2User, comment: 'おはよう ', emotes: [{ placeInComment: 5, emote: emotes[0]!.emote }] }, NOW)).toMatchObject({ kind: 'comment', content: 'おはよう ' });
+  });
+
   it('member: action 1 = 入室、3 = サブスク(入室ではない)', () => {
     const j = normalize('WebcastMemberMessage', { common: { msgId: '12' }, user: v2User, action: 1 }, NOW);
     expect(j).toMatchObject({ kind: 'join', action: 1 });
