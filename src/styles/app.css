@@ -1175,15 +1175,28 @@ img {
 /* バッジ + 💬🎁❤️ の数(❤️ は最後の時刻つき)を 1 行に */
 .person-summary {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* 必ず 1 行。入り切らなければ横にスクロール */
   align-items: center;
-  gap: 4px 10px;
-  font-size: var(--fs);
+  gap: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
+}
+.person-summary::-webkit-scrollbar {
+  display: none;
+}
+.person-summary > * {
+  flex: none;
 }
 /* 数の項目をバッジと同じ段に流す(数のまとまりごとに折り返さない) */
 .person-summary .prow-counts {
   display: contents;
+}
+.person-summary .prow-counts > span {
+  flex: none;
 }
 /* 人物シートのコメント行。名前・アイコンは上に出ているので、時刻 + 本文だけ */
 .row.cline {
