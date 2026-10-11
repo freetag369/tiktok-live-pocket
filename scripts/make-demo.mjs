@@ -17,8 +17,8 @@ const users = [
   { id: '5', displayId: 'yuna_yy', nickname: 'ゆな' },
   { id: '6', displayId: 'daichi88', nickname: 'だいち' },
   { id: '7', displayId: 'ao_ao', nickname: 'あお' },
-  // ニックネームが無い入室者(@ハンドルだけで届く)。本画面では下の固定枠に出る
-  { id: '8', displayId: 'user8821930', nickname: '' },
+  // ニックネーム未設定の入室者(TikTok の既定名 user + 数字のまま届く)。本画面では下の固定枠に出る
+  { id: '8', displayId: 'user8821930', nickname: 'user8821930' },
 ];
 const user = (u) => ({
   id: u.id,

@@ -18,8 +18,10 @@ interface Props {
   onTapRow?: (row: FeedRow) => void;
 }
 
-/** 固定枠の表示名: ニックネームが無いので @ハンドル、それも無ければユーザー ID。 */
+/** 固定枠の表示名: 既定名(user + 数字)ならそのまま、空なら @ハンドル、それも無ければユーザー ID。 */
 export function namelessLabel(v: JoinRow['viewer']): string {
+  const nick = v.nickname?.trim();
+  if (nick) return nick;
   return v.uniqueId ? `@${v.uniqueId}` : `ID ${v.userId}`;
 }
 
@@ -44,7 +46,7 @@ export function NamelessDock({ rows, showAvatars, memos, onTapRow }: Props) {
       </div>
       <div ref={ref} className="dock-list">
         <div className="dock-inner">
-          {rows.length === 0 ? <div className="dock-empty">ニックネームの無い入室者はここに出ます</div> : null}
+          {rows.length === 0 ? <div className="dock-empty">ニックネーム未設定(user + 数字)の入室者はここに出ます</div> : null}
           {rows.map((r) => {
             const v = r.viewer;
             const label = namelessLabel(v);
@@ -52,7 +54,7 @@ export function NamelessDock({ rows, showAvatars, memos, onTapRow }: Props) {
             const cls = `row join dock-row${r.firstEver ? ' first' : ''}${m?.note || m?.previousNote ? ' has-memo' : ''}${onTapRow ? ' tappable' : ''}`;
             return (
               <div key={r.id} className={cls} data-id={r.id} onClick={onTapRow ? () => onTapRow(r) : undefined}>
-                <Avatar url={v.avatarUrl} name={v.uniqueId || v.userId} enabled={showAvatars} />
+                <Avatar url={v.avatarUrl} name={v.nickname?.trim() || v.uniqueId || v.userId} enabled={showAvatars} />
                 <div className="body">
                   <div className="head">
                     <GradeBadge v={v} />
