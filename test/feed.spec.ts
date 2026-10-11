@@ -9,10 +9,9 @@ import {
   enterRoom,
   FEED_KEEP_JOINS,
   filterRows,
-  isNamelessJoin,
-  isNamelessViewer,
+  dockJoins,
+  isJoinRow,
   JOIN_DEDUPE_MS,
-  namelessJoins,
   reconcileWindow,
   restoreFeed,
   tailWindow,
@@ -293,57 +292,38 @@ describe('タブと配信の区切り(filterRows)', () => {
     expect(filterRows(s.rows, 'gift')).toEqual([]);
   });
 
-  it('ニックネームの無い入室は dropNameless で上から外れ、namelessJoins が末尾から拾う', () => {
+  it('入室は dropJoins で上から外れ、dockJoins が末尾から拾う(すべて・コメントタブだけ)', () => {
     let s = createFeedState();
     s = enterRoom(s, 'r1', { now: NOW });
     s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1', nickname: 'たろう' }, action: 1 }, meta);
     s = applyEvent(s, { kind: 'join', msgId: 'j2', tsMs: NOW + 2, viewer: { userId: 'u2', uniqueId: 'handle_only' }, action: 1 }, meta);
-    s = applyEvent(s, { kind: 'join', msgId: 'j3', tsMs: NOW + 3, viewer: { userId: 'u3', nickname: '  ' }, action: 1 }, meta);
+    s = applyEvent(s, { kind: 'join', msgId: 'j3', tsMs: NOW + 3, viewer: { userId: 'u3', nickname: 'user28420669859' }, action: 1 }, meta);
     s = applyEvent(s, comment('c1', 'hi', 'u4'), meta);
-    expect(s.rows.filter(isNamelessJoin).map((r) => r.id)).toEqual(['j2', 'j3']);
+    s = applyEvent(s, { kind: 'social', msgId: 's1', tsMs: NOW + 5, viewer: { userId: 'u5' }, sub: 'follow' }, meta);
+    expect(s.rows.filter(isJoinRow).map((r) => r.id)).toEqual(['j1', 'j2', 'j3']);
     // 入室の件数は今まで通り(表示先が変わるだけ)
     expect(s.joinCount).toBe(3);
 
-    expect(filterRows(s.rows, 'all', { dropNameless: true }).map((r) => r.id)).toEqual(['j1', 'c1']);
-    expect(filterRows(s.rows, 'join', { dropNameless: true }).map((r) => r.id)).toEqual(['j1']);
-    // 既定(アーカイブ)は外さない
-    expect(filterRows(s.rows, 'join').map((r) => r.id)).toEqual(['j1', 'j2', 'j3']);
+    // 名前の有無に関係なく、入室は全部外れる(フォローは残る)
+    expect(filterRows(s.rows, 'all', { dropJoins: true }).map((r) => r.id)).toEqual(['c1', 's1']);
+    expect(filterRows(s.rows, 'comment', { dropJoins: true }).map((r) => r.id)).toEqual(['c1']);
+    // 入室タブ(枠なし)と既定(アーカイブ)は外さない
+    expect(filterRows(s.rows, 'join').map((r) => r.id)).toEqual(['j1', 'j2', 'j3', 's1']);
+    expect(filterRows(s.rows, 'all').map((r) => r.id)).toEqual(['j1', 'j2', 'j3', 'c1', 's1']);
 
-    expect(namelessJoins(s.rows, 'all').map((r) => r.id)).toEqual(['j2', 'j3']);
-    expect(namelessJoins(s.rows, 'join', 1).map((r) => r.id)).toEqual(['j3']);
-    expect(namelessJoins(s.rows, 'comment')).toEqual([]);
-    expect(namelessJoins(s.rows, 'gift')).toEqual([]);
+    expect(dockJoins(s.rows, 'all').map((r) => r.id)).toEqual(['j1', 'j2', 'j3']);
+    expect(dockJoins(s.rows, 'comment').map((r) => r.id)).toEqual(['j1', 'j2', 'j3']);
+    expect(dockJoins(s.rows, 'all', 1).map((r) => r.id)).toEqual(['j3']);
+    expect(dockJoins(s.rows, 'join')).toEqual([]);
+    expect(dockJoins(s.rows, 'gift')).toEqual([]);
   });
 
-  it('TikTok の既定名(user + 数字)はニックネーム未設定として扱う(実際の配信では空では届かない)', () => {
-    const v = (nickname?: string, uniqueId?: string) => ({ userId: 'u', nickname, uniqueId });
-    // PC 版 DB にあった実例
-    expect(isNamelessViewer(v('user28420669859', 'user28420669859'))).toBe(true);
-    expect(isNamelessViewer(v('user125698077740395', 'user9936875246900805'))).toBe(true);
-    expect(isNamelessViewer(v('User628366192'))).toBe(true);
-    expect(isNamelessViewer(v(''))).toBe(true);
-    expect(isNamelessViewer(v(undefined, 'handle'))).toBe(true);
-    // 自分で付けた名前はそのまま上に出す
-    expect(isNamelessViewer(v('たろう'))).toBe(false);
-    expect(isNamelessViewer(v('user'))).toBe(false);
-    expect(isNamelessViewer(v('user123'))).toBe(false);
-    expect(isNamelessViewer(v('superuser123456'))).toBe(false);
-    expect(isNamelessViewer(v('user123456x'))).toBe(false);
-
+  it('入室しか無いタブは上が空(「まだ何も届いていません」)になり、枠には出る', () => {
     let s = createFeedState();
     s = enterRoom(s, 'r1', { now: NOW });
-    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1', uniqueId: 'user28420669859', nickname: 'user28420669859' }, action: 1 }, meta);
-    s = applyEvent(s, { kind: 'join', msgId: 'j2', tsMs: NOW + 2, viewer: { userId: 'u2', uniqueId: 'kenji_ks', nickname: 'けんじ' }, action: 1 }, meta);
-    expect(filterRows(s.rows, 'join', { dropNameless: true }).map((r) => r.id)).toEqual(['j2']);
-    expect(namelessJoins(s.rows, 'join').map((r) => r.id)).toEqual(['j1']);
-  });
-
-  it('ニックネーム無しの入室しか無いタブは上が空(「まだ何も届いていません」)になる', () => {
-    let s = createFeedState();
-    s = enterRoom(s, 'r1', { now: NOW });
-    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1' }, action: 1 }, meta);
-    expect(filterRows(s.rows, 'join', { dropNameless: true })).toEqual([]);
-    expect(namelessJoins(s.rows, 'join')).toHaveLength(1);
+    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1', nickname: 'たろう' }, action: 1 }, meta);
+    expect(filterRows(s.rows, 'all', { dropJoins: true })).toEqual([]);
+    expect(dockJoins(s.rows, 'all')).toHaveLength(1);
   });
 });
 
