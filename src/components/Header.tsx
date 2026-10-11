@@ -9,6 +9,11 @@ interface Props {
   hostUniqueId: string;
   diamonds: number;
   demo: boolean;
+  /** 接続中(押すと切断)。 */
+  connected: boolean;
+  /** 配信者名と API キーが揃っている(揃うまで「接続」は押せない)。 */
+  canConnect: boolean;
+  onToggleConnect: () => void;
   onSettings: () => void;
   onArchive: () => void;
 }
@@ -33,7 +38,7 @@ function statusText(s: SocketState, room: RoomState, now: number, demo: boolean)
   }
 }
 
-export function Header({ socket, room, hostUniqueId, diamonds, demo, onSettings, onArchive }: Props) {
+export function Header({ socket, room, hostUniqueId, diamonds, demo, connected, canConnect, onToggleConnect, onSettings, onArchive }: Props) {
   const [now, setNow] = useState(Date.now());
   const ticking = socket.s === 'waitingLive' || socket.s === 'reconnecting';
   useEffect(() => {
@@ -62,6 +67,16 @@ export function Header({ socket, room, hostUniqueId, diamonds, demo, onSettings,
           💎<b>{num(diamonds)}</b>
         </span>
       </div>
+      {/* 接続 / 切断。下のバーから一番上へ移した(その分フィードが縦に広がる)。デモ中に押すとデモを止めて接続する */}
+      <button
+        className={`connbtn${connected ? '' : ' primary'}`}
+        disabled={!connected && !canConnect}
+        onClick={onToggleConnect}
+        title={connected ? '切断' : demo ? 'デモを止めて接続' : '接続'}
+        aria-label={connected ? '切断' : demo ? 'デモを止めて接続' : '接続'}
+      >
+        {connected ? '切断' : '接続'}
+      </button>
       <button className="iconbtn" onClick={onArchive} aria-label="アーカイブ">
         🗂
       </button>

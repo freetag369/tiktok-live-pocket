@@ -349,11 +349,21 @@ function inTab(r: FeedRow, tab: Tab): boolean {
   }
 }
 
+/** ニックネームの無い入室(@ハンドルやユーザー ID で出ている人)。本画面では下の固定枠に分けて出す。 */
+export function isNamelessJoin(i: FeedItem): i is Extract<FeedRow, { k: 'join' }> {
+  return i.k === 'join' && !i.viewer.nickname?.trim();
+}
+
+export interface FilterOptions {
+  /** ニックネームの無い入室を外す(本画面用。下の固定枠が別に出すので、上には並べない)。 */
+  dropNameless?: boolean;
+}
+
 /**
  * タブで絞る。配信の区切りは全タブに残すが、続けて並んだ区切りは後ろだけにし、
  * その種類の行が 1 つも無ければ空にする(「まだ何も届いていません」を出すため)。
  */
-export function filterRows<T extends FeedItem>(items: T[], tab: Tab): T[] {
+export function filterRows<T extends FeedItem>(items: T[], tab: Tab, opts?: FilterOptions): T[] {
   const out: T[] = [];
   let rows = 0;
   for (const i of items) {
@@ -364,11 +374,26 @@ export function filterRows<T extends FeedItem>(items: T[], tab: Tab): T[] {
       continue;
     }
     if (!inTab(i, tab)) continue;
+    if (opts?.dropNameless && isNamelessJoin(i)) continue;
     out.push(i);
     rows++;
   }
   if (rows === 0) return [];
   return out.length === items.length ? items : out;
+}
+
+/** 下の固定枠に持つ行数(枠の見た目は 3 行。それより前は枠の中を上へスクロールして見る)。 */
+export const NAMELESS_DOCK_KEEP = 50;
+
+/** 下の固定枠に出す行: ニックネームの無い入室の末尾 limit 件(古い順)。入室が流れないタブでは空。 */
+export function namelessJoins(items: FeedItem[], tab: Tab, limit = NAMELESS_DOCK_KEEP): Array<Extract<FeedRow, { k: 'join' }>> {
+  if (tab !== 'all' && tab !== 'join') return [];
+  const out: Array<Extract<FeedRow, { k: 'join' }>> = [];
+  for (let i = items.length - 1; i >= 0 && out.length < limit; i--) {
+    const it = items[i]!;
+    if (isNamelessJoin(it)) out.push(it);
+  }
+  return out.reverse();
 }
 
 /**

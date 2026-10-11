@@ -91,7 +91,8 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
   const anchor = useRef<{ id: string; top: number } | null>(null);
   const [, bump] = useState(0);
 
-  const items = useMemo(() => filterRows(rows, tab), [rows, tab]);
+  // ニックネームの無い入室は上に並べず、下の固定枠(NamelessDock)に出す。
+  const items = useMemo(() => filterRows(rows, tab, { dropNameless: true }), [rows, tab]);
 
   let shown: FeedItem[];
   let hiddenBefore: number;
