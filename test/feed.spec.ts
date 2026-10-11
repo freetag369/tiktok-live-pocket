@@ -10,6 +10,7 @@ import {
   FEED_KEEP_JOINS,
   filterRows,
   isNamelessJoin,
+  isNamelessViewer,
   JOIN_DEDUPE_MS,
   namelessJoins,
   reconcileWindow,
@@ -312,6 +313,29 @@ describe('タブと配信の区切り(filterRows)', () => {
     expect(namelessJoins(s.rows, 'join', 1).map((r) => r.id)).toEqual(['j3']);
     expect(namelessJoins(s.rows, 'comment')).toEqual([]);
     expect(namelessJoins(s.rows, 'gift')).toEqual([]);
+  });
+
+  it('TikTok の既定名(user + 数字)はニックネーム未設定として扱う(実際の配信では空では届かない)', () => {
+    const v = (nickname?: string, uniqueId?: string) => ({ userId: 'u', nickname, uniqueId });
+    // PC 版 DB にあった実例
+    expect(isNamelessViewer(v('user28420669859', 'user28420669859'))).toBe(true);
+    expect(isNamelessViewer(v('user125698077740395', 'user9936875246900805'))).toBe(true);
+    expect(isNamelessViewer(v('User628366192'))).toBe(true);
+    expect(isNamelessViewer(v(''))).toBe(true);
+    expect(isNamelessViewer(v(undefined, 'handle'))).toBe(true);
+    // 自分で付けた名前はそのまま上に出す
+    expect(isNamelessViewer(v('たろう'))).toBe(false);
+    expect(isNamelessViewer(v('user'))).toBe(false);
+    expect(isNamelessViewer(v('user123'))).toBe(false);
+    expect(isNamelessViewer(v('superuser123456'))).toBe(false);
+    expect(isNamelessViewer(v('user123456x'))).toBe(false);
+
+    let s = createFeedState();
+    s = enterRoom(s, 'r1', { now: NOW });
+    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1', uniqueId: 'user28420669859', nickname: 'user28420669859' }, action: 1 }, meta);
+    s = applyEvent(s, { kind: 'join', msgId: 'j2', tsMs: NOW + 2, viewer: { userId: 'u2', uniqueId: 'kenji_ks', nickname: 'けんじ' }, action: 1 }, meta);
+    expect(filterRows(s.rows, 'join', { dropNameless: true }).map((r) => r.id)).toEqual(['j2']);
+    expect(namelessJoins(s.rows, 'join').map((r) => r.id)).toEqual(['j1']);
   });
 
   it('ニックネーム無しの入室しか無いタブは上が空(「まだ何も届いていません」)になる', () => {

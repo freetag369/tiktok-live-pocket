@@ -349,9 +349,21 @@ function inTab(r: FeedRow, tab: Tab): boolean {
   }
 }
 
-/** ニックネームの無い入室(@ハンドルやユーザー ID で出ている人)。本画面では下の固定枠に分けて出す。 */
+/**
+ * TikTok の既定ニックネーム(未設定のまま = `user` + 数字)。
+ * 実際の配信ではニックネームが空で届くことは無く(PC 版 DB の 2,953 人中 0 人)、未設定の人はこの形で届く(同 25 人)。
+ */
+const DEFAULT_NICKNAME = /^user\d{6,}$/i;
+
+/** ニックネームを設定していない人(空、または TikTok の既定名 `user12345678…` のまま)。 */
+export function isNamelessViewer(v: Viewer): boolean {
+  const nick = v.nickname?.trim() ?? '';
+  return nick === '' || DEFAULT_NICKNAME.test(nick);
+}
+
+/** ニックネームの無い入室。本画面では上に流さず、下の固定枠に分けて出す。 */
 export function isNamelessJoin(i: FeedItem): i is Extract<FeedRow, { k: 'join' }> {
-  return i.k === 'join' && !i.viewer.nickname?.trim();
+  return i.k === 'join' && isNamelessViewer(i.viewer);
 }
 
 export interface FilterOptions {
