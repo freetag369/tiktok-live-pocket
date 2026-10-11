@@ -349,26 +349,15 @@ function inTab(r: FeedRow, tab: Tab): boolean {
   }
 }
 
-/**
- * TikTok の既定ニックネーム(未設定のまま = `user` + 数字)。
- * 実際の配信ではニックネームが空で届くことは無く(PC 版 DB の 2,953 人中 0 人)、未設定の人はこの形で届く(同 25 人)。
- */
-const DEFAULT_NICKNAME = /^user\d{6,}$/i;
+export type JoinRow = Extract<FeedRow, { k: 'join' }>;
 
-/** ニックネームを設定していない人(空、または TikTok の既定名 `user12345678…` のまま)。 */
-export function isNamelessViewer(v: Viewer): boolean {
-  const nick = v.nickname?.trim() ?? '';
-  return nick === '' || DEFAULT_NICKNAME.test(nick);
-}
-
-/** ニックネームの無い入室。本画面では上に流さず、下の固定枠に分けて出す。 */
-export function isNamelessJoin(i: FeedItem): i is Extract<FeedRow, { k: 'join' }> {
-  return i.k === 'join' && isNamelessViewer(i.viewer);
+export function isJoinRow(i: FeedItem): i is JoinRow {
+  return i.k === 'join';
 }
 
 export interface FilterOptions {
-  /** ニックネームの無い入室を外す(本画面用。下の固定枠が別に出すので、上には並べない)。 */
-  dropNameless?: boolean;
+  /** 入室の行を外す(本画面用。下の固定枠が入室をまとめて出すので、上には並べない)。 */
+  dropJoins?: boolean;
 }
 
 /**
@@ -386,7 +375,7 @@ export function filterRows<T extends FeedItem>(items: T[], tab: Tab, opts?: Filt
       continue;
     }
     if (!inTab(i, tab)) continue;
-    if (opts?.dropNameless && isNamelessJoin(i)) continue;
+    if (opts?.dropJoins && i.k === 'join') continue;
     out.push(i);
     rows++;
   }
@@ -394,16 +383,21 @@ export function filterRows<T extends FeedItem>(items: T[], tab: Tab, opts?: Filt
   return out.length === items.length ? items : out;
 }
 
-/** 下の固定枠に持つ行数(枠の見た目は 3 行。それより前は枠の中を上へスクロールして見る)。 */
-export const NAMELESS_DOCK_KEEP = 50;
+/** 下の固定枠を出すタブ(すべて・コメント)。入室タブは上のフィードに入室を流すので枠は出さない。 */
+function isDockTab(tab: Tab): boolean {
+  return tab === 'all' || tab === 'comment';
+}
 
-/** 下の固定枠に出す行: ニックネームの無い入室の末尾 limit 件(古い順)。入室が流れないタブでは空。 */
-export function namelessJoins(items: FeedItem[], tab: Tab, limit = NAMELESS_DOCK_KEEP): Array<Extract<FeedRow, { k: 'join' }>> {
-  if (tab !== 'all' && tab !== 'join') return [];
-  const out: Array<Extract<FeedRow, { k: 'join' }>> = [];
+/** 下の固定枠に持つ行数(枠の見た目は 3 行。それより前は枠の中を上へスクロールして見る)。 */
+export const JOIN_DOCK_KEEP = 50;
+
+/** 下の固定枠に出す行: 入室の末尾 limit 件(古い順)。枠を出さないタブでは空。 */
+export function dockJoins(items: FeedItem[], tab: Tab, limit = JOIN_DOCK_KEEP): JoinRow[] {
+  if (!isDockTab(tab)) return [];
+  const out: JoinRow[] = [];
   for (let i = items.length - 1; i >= 0 && out.length < limit; i--) {
     const it = items[i]!;
-    if (isNamelessJoin(it)) out.push(it);
+    if (isJoinRow(it)) out.push(it);
   }
   return out.reverse();
 }
