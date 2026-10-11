@@ -103,6 +103,22 @@ describe('normalize (v2 = Euler Cloud WebSocket)', () => {
     expect(s).toMatchObject({ kind: 'social', sub: 'share' });
   });
 
+  it('social: v2 は displayText.displayType に同じキーが入る(本番 Euler の形)', () => {
+    const f = normalize('WebcastSocialMessage', { common: { msgId: '19', displayText: { displayType: 'pm_main_follow_message_viewer_2' } }, user: v2User }, NOW);
+    expect(f).toMatchObject({ kind: 'social', sub: 'follow' });
+    const s = normalize('WebcastSocialMessage', { common: { msgId: '20', displayText: { displayType: 'pm_mt_guidance_share' } }, user: v2User }, NOW);
+    expect(s).toMatchObject({ kind: 'social', sub: 'share' });
+  });
+
+  it('social: リポストは share 扱い、不明なキーや displayText 無しは other', () => {
+    const r = normalize('WebcastSocialMessage', { common: { msgId: '21', displayText: { displayType: 'ttlive_repost_commentsArea_repostedUsername_im' } }, user: v2User }, NOW);
+    expect(r).toMatchObject({ kind: 'social', sub: 'share' });
+    const u = normalize('WebcastSocialMessage', { common: { msgId: '22', displayText: { displayType: 'pm_mt_something_else' } }, user: v2User }, NOW);
+    expect(u).toMatchObject({ kind: 'social', sub: 'other' });
+    const n = normalize('WebcastSocialMessage', { common: { msgId: '23' }, user: v2User }, NOW);
+    expect(n).toMatchObject({ kind: 'social', sub: 'other' });
+  });
+
   it('roomInfo: id_str と owner を読む', () => {
     const e = normalize('roomInfo', { data: { id_str: '7450000000000000000', owner: { nickname: 'ようくん', display_id: 'metafact8' } } }, NOW);
     expect(e).toMatchObject({ kind: 'roomInfo', roomId: '7450000000000000000', hostNickname: 'ようくん', hostUniqueId: 'metafact8' });
