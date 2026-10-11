@@ -7,7 +7,7 @@ import type { LikeEntry } from '../lib/likes';
 import type { MemoRecord } from '../lib/memos';
 import type { LiveSession } from '../lib/session';
 import { Avatar } from './Avatar';
-import { VisitBadge } from './Badges';
+import { RoleBadges, VisitBadge } from './Badges';
 import { FeedRowView } from './FeedRow';
 import type { MemoTarget } from './MemoSheet';
 
@@ -110,7 +110,8 @@ function nameOf(it: Interaction, memo?: MemoRecord): { name: string; handle: str
   return { name, handle: h && h !== name ? `@${h}` : '' };
 }
 
-function Counts({ it }: { it: Interaction }) {
+/** 💬 🎁💎 ❤️ 🚪 ➕ の数。likeTime を付けると ❤️ に最後のいいね時刻も添える(人物シート用)。 */
+function Counts({ it, likeTime }: { it: Interaction; likeTime?: boolean }) {
   return (
     <div className="prow-counts">
       {it.comments > 0 ? <span>💬 {num(it.comments)}</span> : null}
@@ -119,7 +120,12 @@ function Counts({ it }: { it: Interaction }) {
           🎁 {num(it.gifts)} · <b className="dia">💎 {num(it.diamonds)}</b>
         </span>
       ) : null}
-      {it.likes > 0 ? <span className="likes">❤️ {num(it.likes)}</span> : null}
+      {it.likes > 0 ? (
+        <span className="likes">
+          ❤️ {num(it.likes)}
+          {likeTime && it.likeLastMs ? ` · 最後 ${hhmm(it.likeLastMs)}` : ''}
+        </span>
+      ) : null}
       {it.joins > 0 ? <span className="faint">🚪 {num(it.joins)}</span> : null}
       {it.follows > 0 ? <span className="faint">➕ フォロー</span> : null}
     </div>
@@ -156,8 +162,11 @@ interface PersonProps {
   onBack: () => void;
 }
 
-/** 1 人の履歴(全画面)。行は本画面と同じ FeedRowView。行タップ・📝・下のボタンのどれでもメモが開く。 */
-function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack }: PersonProps) {
+/**
+ * 1 人の履歴(全画面)。上に名前・バッジ・数・メモを 1 回だけ出し、コメントは「時刻 + 本文」だけの行、
+ * ギフト・入室・フォローは本画面と同じ FeedRowView。行タップ・📝・下のボタンのどれでもメモが開く。
+ */
+export function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack }: PersonProps) {
   const { name, handle } = nameOf(it, memo);
   const openMemo = () => onMemo(targetOf(it));
   return (
@@ -173,11 +182,7 @@ function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack }:
               {name}
               {memo?.kana ? <span className="kana">({memo.kana})</span> : null}
             </span>
-            <span className="sub">
-              {handle}
-              {handle ? ' · ' : ''}
-              <VisitBadge visits={it.visits} firstEver={it.firstEver} />
-            </span>
+            {handle ? <span className="sub">{handle}</span> : null}
           </div>
         </div>
         <button className="iconbtn" onClick={openMemo} aria-label="メモを書く">
@@ -185,13 +190,12 @@ function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack }:
         </button>
       </header>
       <div className="person-head">
-        <Counts it={it} />
-        {it.likes > 0 ? (
-          <div className="person-likes">
-            ❤️ いいね <b>{num(it.likes)}</b> 回{it.likeLastMs ? ` · 最後 ${hhmm(it.likeLastMs)}` : ''}
-            <small>(いいねは回数だけで、時刻ごとの履歴は残りません)</small>
-          </div>
-        ) : null}
+        {/* バッジ・やり取りの数・いいね(最後の時刻つき)を 1 行にまとめる */}
+        <div className="person-summary">
+          <VisitBadge visits={it.visits} firstEver={it.firstEver} />
+          <RoleBadges v={it.viewer} />
+          <Counts it={it} likeTime />
+        </div>
         <button className={`memo-line${memo?.note ? '' : ' faint'}`} onClick={openMemo}>
           {memo?.note ? `📝 ${memo.note}` : '📝 メモなし — タップして書く'}
         </button>
@@ -202,7 +206,13 @@ function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack }:
           {it.rows.length === 0 ? (
             <div className="empty">この配信ではいいねだけです。</div>
           ) : (
-            it.rows.map((r) => <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={memo?.note} previousNote={memo?.previousNote} kana={memo?.kana || undefined} onTap={openMemo} />)
+            it.rows.map((r) =>
+              r.k === 'comment' ? (
+                <CommentLine key={r.id} row={r} onTap={openMemo} />
+              ) : (
+                <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={memo?.note} previousNote={memo?.previousNote} kana={memo?.kana || undefined} onTap={openMemo} />
+              )
+            )
           )}
         </div>
       </div>
@@ -211,6 +221,16 @@ function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack }:
           {memo ? '📝 メモを直す' : '📝 メモを書く'}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** コメントの簡易行。名前・アイコン・メモは上に出ているので、時刻と本文だけ。 */
+function CommentLine({ row, onTap }: { row: Extract<FeedRow, { k: 'comment' }>; onTap: () => void }) {
+  return (
+    <div className="row cline tappable" data-id={row.id} onClick={onTap}>
+      <time>{hhmm(row.tsMs)}</time>
+      <span className="text">{row.text}</span>
     </div>
   );
 }
