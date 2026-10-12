@@ -358,6 +358,11 @@ export function isJoinRow(i: FeedItem): i is JoinRow {
 export interface FilterOptions {
   /** 入室の行を外す(本画面用。下の固定枠が入室をまとめて出すので、上には並べない)。 */
   dropJoins?: boolean;
+  /**
+   * dropJoins のとき、これに当たる入室だけは上のフィードに残す(メモ・前回・よみがな持ちの入室)。
+   * 固定枠から外れる分なので、タブの種類(コメントタブでも)に関わらず上に出す。
+   */
+  keepJoin?: (r: JoinRow) => boolean;
 }
 
 /**
@@ -374,8 +379,9 @@ export function filterRows<T extends FeedItem>(items: T[], tab: Tab, opts?: Filt
       else out.push(i);
       continue;
     }
-    if (!inTab(i, tab)) continue;
-    if (opts?.dropJoins && i.k === 'join') continue;
+    if (opts?.dropJoins && isJoinRow(i)) {
+      if (!opts.keepJoin?.(i)) continue;
+    } else if (!inTab(i, tab)) continue;
     out.push(i);
     rows++;
   }
@@ -391,13 +397,16 @@ function isDockTab(tab: Tab): boolean {
 /** 下の固定枠に持つ行数(枠の見た目は 5 行。それより前は枠の中を上へスクロールして見る)。 */
 export const JOIN_DOCK_KEEP = 50;
 
-/** 下の固定枠に出す行: 入室の末尾 limit 件(古い順)。枠を出さないタブでは空。 */
-export function dockJoins(items: FeedItem[], tab: Tab, limit = JOIN_DOCK_KEEP): JoinRow[] {
+/**
+ * 下の固定枠に出す行: 入室の末尾 limit 件(古い順)。枠を出さないタブでは空。
+ * `exclude` に当たる入室(メモ・前回・よみがな持ち)は枠に入れず、上のフィード側(filterRows の keepJoin)に任せる。
+ */
+export function dockJoins(items: FeedItem[], tab: Tab, limit = JOIN_DOCK_KEEP, exclude?: (r: JoinRow) => boolean): JoinRow[] {
   if (!isDockTab(tab)) return [];
   const out: JoinRow[] = [];
   for (let i = items.length - 1; i >= 0 && out.length < limit; i--) {
     const it = items[i]!;
-    if (isJoinRow(it)) out.push(it);
+    if (isJoinRow(it) && !exclude?.(it)) out.push(it);
   }
   return out.reverse();
 }
