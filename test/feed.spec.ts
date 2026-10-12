@@ -319,6 +319,21 @@ describe('タブと配信の区切り(filterRows)', () => {
     expect(dockJoins(s.rows, 'gift')).toEqual([]);
   });
 
+  it('メモ持ちの入室は keepJoin で上に残り(コメントタブでも)、dockJoins の exclude で枠から外れる', () => {
+    let s = createFeedState();
+    s = enterRoom(s, 'r1', { now: NOW });
+    s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'memo' }, action: 1 }, meta);
+    s = applyEvent(s, { kind: 'join', msgId: 'j2', tsMs: NOW + 2, viewer: { userId: 'plain' }, action: 1 }, meta);
+    s = applyEvent(s, comment('c1', 'hi', 'u4'), meta);
+    const hasMemo = (r: { viewer: { userId: string } }) => r.viewer.userId === 'memo';
+    expect(filterRows(s.rows, 'all', { dropJoins: true, keepJoin: hasMemo }).map((r) => r.id)).toEqual(['j1', 'c1']);
+    expect(filterRows(s.rows, 'comment', { dropJoins: true, keepJoin: hasMemo }).map((r) => r.id)).toEqual(['j1', 'c1']);
+    expect(dockJoins(s.rows, 'all', 50, hasMemo).map((r) => r.id)).toEqual(['j2']);
+    expect(dockJoins(s.rows, 'comment', 50, hasMemo).map((r) => r.id)).toEqual(['j2']);
+    // 上限は外した後の件数で数える
+    expect(dockJoins(s.rows, 'all', 1, hasMemo).map((r) => r.id)).toEqual(['j2']);
+  });
+
   it('入室しか無いタブは上が空(「まだ何も届いていません」)になり、枠には出る', () => {
     let s = createFeedState();
     s = enterRoom(s, 'r1', { now: NOW });

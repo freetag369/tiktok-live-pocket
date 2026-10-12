@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import type { FeedRow, JoinRow } from '../lib/feed';
 import { hhmm, lastJoined } from '../lib/format';
-import type { MemoRecord } from '../lib/memos';
 import { Avatar } from './Avatar';
 import { GradeBadge, VisitBadge } from './Badges';
 
@@ -9,10 +8,9 @@ import { GradeBadge, VisitBadge } from './Badges';
 export const DOCK_ROWS = 5;
 
 interface Props {
-  /** 入室(古い順)。feed.ts の dockJoins で絞ったもの。 */
+  /** 入室(古い順)。feed.ts の dockJoins で絞ったもの(メモ・前回・よみがなの無い人だけ)。 */
   rows: JoinRow[];
   showAvatars: boolean;
-  memos: ReadonlyMap<string, MemoRecord>;
   previousJoinedFor?: (userId: string) => number | undefined;
   onTapRow?: (row: FeedRow) => void;
 }
@@ -26,10 +24,11 @@ export function dockLabel(v: JoinRow['viewer']): string {
 
 /**
  * 画面の一番下に固定する「入室」の枠。すべて・コメントタブに出す。
+ * メモ・前回・よみがなのどれも書いていない人の入室だけをここに出し、書いてある人の入室は上のフィードに流す(目立たせるため)。
  * 上のフィードとは別の固定カテゴリで、高さは入室 5 行ぶん。新着は下に積まれ、古い分は枠の中を上へスクロールして見る。
  * 行はコンパクト(1 行)にして、名前・回数(初見)・前回入室・時刻だけ出す(タップでメモのシートが開く)。
  */
-export function JoinDock({ rows, showAvatars, memos, previousJoinedFor, onTapRow }: Props) {
+export function JoinDock({ rows, showAvatars, previousJoinedFor, onTapRow }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   // 枠が小さいので追従の ON/OFF は持たず、行が変わるたびに最下部へ寄せる。
   useLayoutEffect(() => {
@@ -49,8 +48,7 @@ export function JoinDock({ rows, showAvatars, memos, previousJoinedFor, onTapRow
           {rows.map((r) => {
             const v = r.viewer;
             const label = dockLabel(v);
-            const m = memos.get(v.userId);
-            const cls = `row join dock-row${r.firstEver ? ' first' : ''}${m?.note || m?.previousNote ? ' has-memo' : ''}${onTapRow ? ' tappable' : ''}`;
+            const cls = `row join dock-row${r.firstEver ? ' first' : ''}${onTapRow ? ' tappable' : ''}`;
             return (
               <div key={r.id} className={cls} data-id={r.id} onClick={onTapRow ? () => onTapRow(r) : undefined}>
                 <Avatar url={v.avatarUrl} name={label} enabled={showAvatars} />

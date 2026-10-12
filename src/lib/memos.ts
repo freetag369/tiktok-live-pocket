@@ -30,6 +30,11 @@ export interface MemoPatch {
   uniqueId?: string;
 }
 
+/** メモ・前回・よみがなのどれかが書いてあるか。入室の表示先(上のフィード / 下の固定枠)を分けるのに使う。 */
+export function hasMemoContent(m: MemoRecord | undefined): boolean {
+  return !!m && !!(m.note || m.previousNote || m.kana);
+}
+
 export const MEMO_MAX_LEN = 500;
 export const KANA_MAX_LEN = 50;
 

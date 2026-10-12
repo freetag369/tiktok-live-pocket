@@ -8,7 +8,8 @@ import { Highlights } from './components/Highlights';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
-import { countDataRows, dockJoins, type FeedRow } from './lib/feed';
+import { countDataRows, dockJoins, JOIN_DOCK_KEEP, type FeedRow, type JoinRow } from './lib/feed';
+import { hasMemoContent } from './lib/memos';
 import { JoinDock } from './components/JoinDock';
 import { FollowToast } from './components/FollowToast';
 import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
@@ -110,10 +111,11 @@ export function App() {
 
   const f = snap.feed;
   const hasRows = f.rows.some((r) => r.k !== 'room');
-  // 下の固定枠(入室)。「すべて」「コメント」タブに出し、そこでは上のフィードに入室を流さない。
+  // 下の固定枠(入室)。「すべて」「コメント」タブに出す。メモ・前回・よみがなの無い人の入室は枠へ、ある人の入室は上のフィードへ(FeedList の keepJoin)。
   const dockTab = tab === 'all' || tab === 'comment' ? tab : null;
   const docked = dockTab !== null;
-  const dockRows = useMemo(() => (dockTab ? dockJoins(f.rows, dockTab) : []), [dockTab, f.rows]);
+  const memoJoin = useCallback((r: JoinRow) => hasMemoContent(snap.memos.get(r.viewer.userId)), [snap.memos]);
+  const dockRows = useMemo(() => (dockTab ? dockJoins(f.rows, dockTab, JOIN_DOCK_KEEP, memoJoin) : []), [dockTab, f.rows, memoJoin]);
   const tabs: Array<[AppTab, string, number | null]> = [
     ['all', 'すべて', null],
     ['comment', 'コメント', f.commentCount],
@@ -263,7 +265,7 @@ export function App() {
           {settings.likePopup ? <LikeToasts likes={f.likes} likeCount={f.likeCount} showAvatars={settings.showAvatars} /> : null}
         </div>
       )}
-      {docked ? <JoinDock rows={dockRows} showAvatars={settings.showAvatars} memos={snap.memos} previousJoinedFor={session.previousJoinedFor} onTapRow={onTapRow} /> : null}
+      {docked ? <JoinDock rows={dockRows} showAvatars={settings.showAvatars} previousJoinedFor={session.previousJoinedFor} onTapRow={onTapRow} /> : null}
       {showArchive ? <ArchiveSheet memos={snap.archiveMemos} session={session} settings={settings} currentRoomId={snap.demo ? '' : snap.room.roomId} onClose={() => setShowArchive(false)} /> : null}
       {showSettings ? (
         <SettingsSheet

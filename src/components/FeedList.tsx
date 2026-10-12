@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { countAfter, filterRows, firstRowsPerRoom, reconcileWindow, tailWindow, type FeedItem, type FeedRow, type Tab } from '../lib/feed';
 import { dateRange, num } from '../lib/format';
-import type { MemoRecord } from '../lib/memos';
+import { hasMemoContent, type MemoRecord } from '../lib/memos';
 import { FeedRowView } from './FeedRow';
 
 export { filterRows, type Tab };
@@ -23,7 +23,7 @@ interface Props {
   memos: ReadonlyMap<string, MemoRecord>;
   onTapRow?: (row: FeedRow) => void;
   previousJoinedFor?: (userId: string) => number | undefined;
-  /** 下の固定枠(JoinDock)が入室を出しているタブでは、上のフィードに入室を流さない。 */
+  /** 下の固定枠(JoinDock)が入室を出しているタブ。メモ・前回・よみがなの無い入室は上に流さず枠に出し、ある人の入室だけ上に流す。 */
   docked?: boolean;
 }
 
@@ -93,8 +93,11 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
   const anchor = useRef<{ id: string; top: number } | null>(null);
   const [, bump] = useState(0);
 
-  // 枠のあるタブでは入室を上に並べず、下の固定枠(JoinDock)に出す。
-  const items = useMemo(() => filterRows(rows, tab, { dropJoins: !!docked }), [rows, tab, docked]);
+  // 枠のあるタブでは、メモ・前回・よみがなの無い入室は上に並べず下の固定枠(JoinDock)に出す。ある人の入室は上に流す。
+  const items = useMemo(
+    () => filterRows(rows, tab, docked ? { dropJoins: true, keepJoin: (r) => hasMemoContent(memos.get(r.viewer.userId)) } : undefined),
+    [rows, tab, docked, memos],
+  );
   // 「前回」メモは、その配信でその人が最初に現れた行にだけ出す(毎行は出さない)。
   const firstIds = useMemo(() => firstRowsPerRoom(items), [items]);
 
