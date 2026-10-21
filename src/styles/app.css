@@ -432,6 +432,11 @@ img {
   border-left-color: var(--pink);
   background: rgba(255, 92, 138, 0.07);
 }
+/* お気に入りは青。初見(ピンク)より優先する(付けた直後に色が変わって分かるように)。ギフトの金は残す。 */
+.row.fav {
+  border-left-color: var(--blue);
+  background: rgba(90, 169, 255, 0.1);
+}
 /* タップでメモ。押した感触だけ返す(選択ハイライトは出さない)。 */
 .row.tappable {
   cursor: pointer;
@@ -441,8 +446,8 @@ img {
 .row.tappable:active {
   background: var(--bg-2);
 }
-/* メモ持ちは左に金線。初見(ピンク)の方を優先する。 */
-.row.has-memo:not(.first):not(.gift) {
+/* メモ持ちは左に金線。初見(ピンク)・お気に入り(青)の方を優先する。 */
+.row.has-memo:not(.first):not(.fav):not(.gift) {
   border-left-color: var(--gold);
 }
 .kana {
@@ -868,6 +873,24 @@ img {
 .msheet-sub {
   margin-top: 3px;
 }
+/* お気に入りの切り替え。付いている間は青。 */
+.favbtn {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--bg-2);
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.favbtn.on {
+  border-color: var(--blue);
+  background: rgba(90, 169, 255, 0.18);
+  color: var(--blue);
+}
 .msheet-label {
   display: flex;
   align-items: baseline;
@@ -983,6 +1006,13 @@ img {
 }
 .vrow.has-memo {
   border-left-color: var(--gold);
+}
+.vrow.fav {
+  border-left-color: var(--blue);
+  background: rgba(90, 169, 255, 0.1);
+}
+.vrow.fav:active {
+  background: var(--bg-2);
 }
 .vrow .body {
   flex: 1;
@@ -1490,6 +1520,10 @@ img {
   color: var(--pink);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+.rank-row.fav {
+  border-left-color: var(--blue);
+  background: rgba(90, 169, 255, 0.1);
 }
 .rank-row.live {
   border-left-color: var(--pink);

@@ -116,6 +116,7 @@ export function App() {
   const docked = dockTab !== null;
   const memoJoin = useCallback((r: JoinRow) => hasMemoContent(snap.memos.get(r.viewer.userId)), [snap.memos]);
   const dockRows = useMemo(() => (dockTab ? dockJoins(f.rows, dockTab, JOIN_DOCK_KEEP, memoJoin) : []), [dockTab, f.rows, memoJoin]);
+  const isFavorite = useCallback((userId: string) => Boolean(snap.memos.get(userId)?.favorite), [snap.memos]);
   const tabs: Array<[AppTab, string, number | null]> = [
     ['all', 'すべて', null],
     ['comment', 'コメント', f.commentCount],
@@ -265,7 +266,7 @@ export function App() {
           {settings.likePopup ? <LikeToasts likes={f.likes} likeCount={f.likeCount} showAvatars={settings.showAvatars} /> : null}
         </div>
       )}
-      {docked ? <JoinDock rows={dockRows} showAvatars={settings.showAvatars} previousJoinedFor={session.previousJoinedFor} onTapRow={onTapRow} /> : null}
+      {docked ? <JoinDock rows={dockRows} showAvatars={settings.showAvatars} previousJoinedFor={session.previousJoinedFor} isFavorite={isFavorite} onTapRow={onTapRow} /> : null}
       {showArchive ? <ArchiveSheet memos={snap.archiveMemos} session={session} settings={settings} currentRoomId={snap.demo ? '' : snap.room.roomId} onClose={() => setShowArchive(false)} /> : null}
       {showSettings ? (
         <SettingsSheet
@@ -301,6 +302,7 @@ export function App() {
           current={snap.memos.get(memoTarget.userId)}
           showAvatars={settings.showAvatars}
           onSave={(patch) => session.setMemo(memoTarget.userId, patch)}
+          onFavorite={(favorite) => session.setMemo(memoTarget.userId, { favorite, nickname: memoTarget.nickname, uniqueId: memoTarget.uniqueId })}
           onClose={() => setMemoTarget(null)}
         />
       ) : null}

@@ -15,16 +15,18 @@ export interface RowProps {
   /** 「前回」メモ。フィードでは配信ごとにその人の最初の行にだけ渡される(FeedList 側で絞る)。 */
   previousNote?: string;
   kana?: string;
+  /** お気に入りの人。行の背景を青にする。 */
+  favorite?: boolean;
   showPreviousJoined?: boolean;
   previousJoinedMs?: number;
   /** 行をタップしたとき(メモを書く)。 */
   onTap?: (row: Row) => void;
 }
 
-export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, previousNote, kana, onTap, showPreviousJoined, previousJoinedMs }: RowProps) {
+export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, previousNote, kana, favorite, onTap, showPreviousJoined, previousJoinedMs }: RowProps) {
   const v = row.viewer;
   const name = v.nickname || v.uniqueId || v.userId;
-  const extra = `${row.firstEver ? ' first' : ''}${note || previousNote ? ' has-memo' : ''}${onTap ? ' tappable' : ''}`;
+  const extra = `${row.firstEver ? ' first' : ''}${favorite ? ' fav' : ''}${note || previousNote ? ' has-memo' : ''}${onTap ? ' tappable' : ''}`;
   const click = onTap ? () => onTap(row) : undefined;
   const kanaEl = kana ? <span className="kana">({kana})</span> : null;
   const memoEl = <MemoLines note={note} previousNote={previousNote} />;

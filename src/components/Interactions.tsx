@@ -4,7 +4,7 @@ import type { FeedItem, FeedRow } from '../lib/feed';
 import { hhmm, num, lastJoined } from '../lib/format';
 import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sortInteractions, type Interaction, type InteractionSort } from '../lib/interactions';
 import type { LikeEntry } from '../lib/likes';
-import type { MemoRecord } from '../lib/memos';
+import { hasMemoContent, type MemoRecord } from '../lib/memos';
 import type { LiveSession } from '../lib/session';
 import { Avatar } from './Avatar';
 import { RoleBadges, VisitBadge } from './Badges';
@@ -135,7 +135,7 @@ function Counts({ it, likeTime }: { it: Interaction; likeTime?: boolean }) {
 function PersonRow({ it, memo, showAvatars, onPick, previousJoinedMs }: { previousJoinedMs?: number; it: Interaction; memo?: MemoRecord; showAvatars: boolean; onPick: () => void }) {
   const { name, handle } = nameOf(it, memo);
   return (
-    <button className={`vrow prow${memo ? ' has-memo' : ''}`} onClick={onPick}>
+    <button className={`vrow prow${hasMemoContent(memo) ? ' has-memo' : ''}${memo?.favorite ? ' fav' : ''}`} onClick={onPick}>
       <Avatar url={it.viewer.avatarUrl} name={name} enabled={showAvatars} />
       <div className="body">
         <div className="head">
@@ -210,7 +210,7 @@ export function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, on
               r.k === 'comment' ? (
                 <CommentLine key={r.id} row={r} onTap={openMemo} />
               ) : (
-                <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={memo?.note} previousNote={memo?.previousNote} kana={memo?.kana || undefined} onTap={openMemo} />
+                <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={memo?.note} previousNote={memo?.previousNote} kana={memo?.kana || undefined} favorite={memo?.favorite} onTap={openMemo} />
               )
             )
           )}
@@ -218,7 +218,7 @@ export function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, on
       </div>
       <div className="archive-actions">
         <button className="btn primary" onClick={openMemo}>
-          {memo ? '📝 メモを直す' : '📝 メモを書く'}
+          {hasMemoContent(memo) ? '📝 メモを直す' : '📝 メモを書く'}
         </button>
       </div>
     </div>

@@ -68,7 +68,7 @@ const LikeRankRow = memo(function LikeRankRow({ entry, userMemo, pos, live, show
   const name = v.nickname || v.uniqueId || v.userId;
   const handle = v.uniqueId && v.uniqueId !== v.nickname ? `@${v.uniqueId}` : '';
   return (
-    <div className={`rank-row${pos <= 3 ? ' top3' : ''}${live ? ' live' : ''}`}>
+    <div className={`rank-row${pos <= 3 ? ' top3' : ''}${live ? ' live' : ''}${userMemo?.favorite ? ' fav' : ''}`}>
       <span className="pos">{pos}</span>
       <Avatar url={v.avatarUrl} name={name} enabled={showAvatars} />
       <div className="body">

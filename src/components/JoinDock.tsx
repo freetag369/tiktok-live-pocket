@@ -12,6 +12,8 @@ interface Props {
   rows: JoinRow[];
   showAvatars: boolean;
   previousJoinedFor?: (userId: string) => number | undefined;
+  /** お気に入りの人か(行の背景を青にする)。 */
+  isFavorite?: (userId: string) => boolean;
   onTapRow?: (row: FeedRow) => void;
 }
 
@@ -28,7 +30,7 @@ export function dockLabel(v: JoinRow['viewer']): string {
  * 上のフィードとは別の固定カテゴリで、高さは入室 5 行ぶん。新着は下に積まれ、古い分は枠の中を上へスクロールして見る。
  * 行はコンパクト(1 行)にして、名前・回数(初見)・前回入室・時刻だけ出す(タップでメモのシートが開く)。
  */
-export function JoinDock({ rows, showAvatars, previousJoinedFor, onTapRow }: Props) {
+export function JoinDock({ rows, showAvatars, previousJoinedFor, isFavorite, onTapRow }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   // 枠が小さいので追従の ON/OFF は持たず、行が変わるたびに最下部へ寄せる。
   useLayoutEffect(() => {
@@ -48,7 +50,7 @@ export function JoinDock({ rows, showAvatars, previousJoinedFor, onTapRow }: Pro
           {rows.map((r) => {
             const v = r.viewer;
             const label = dockLabel(v);
-            const cls = `row join dock-row${r.firstEver ? ' first' : ''}${onTapRow ? ' tappable' : ''}`;
+            const cls = `row join dock-row${r.firstEver ? ' first' : ''}${isFavorite?.(v.userId) ? ' fav' : ''}${onTapRow ? ' tappable' : ''}`;
             return (
               <div key={r.id} className={cls} data-id={r.id} onClick={onTapRow ? () => onTapRow(r) : undefined}>
                 <Avatar url={v.avatarUrl} name={label} enabled={showAvatars} />

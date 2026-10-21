@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { MemoLines } from './MemoLines';
+import { hasMemoContent } from '../lib/memos';
 import type { ViewerListItem } from '../lib/session';
 import { lastJoined } from '../lib/format';
 import { Avatar } from './Avatar';
@@ -26,14 +27,14 @@ export function ViewersSheet({ items, showAvatars, onPick, onClose }: Props) {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return items.filter((it) => {
-      if (memoOnly && !it.memo) return false;
+      if (memoOnly && !hasMemoContent(it.memo)) return false;
       if (!needle) return true;
       return [it.nickname, it.uniqueId, it.memo?.note, it.memo?.previousNote, it.memo?.kana].some((s) => s && s.toLowerCase().includes(needle));
     });
   }, [items, q, memoOnly]);
 
   const shown = filtered.slice(0, limit);
-  const memoCount = items.reduce((n, it) => n + (it.memo ? 1 : 0), 0);
+  const memoCount = items.reduce((n, it) => n + (hasMemoContent(it.memo) ? 1 : 0), 0);
 
   return (
     <div className="sheet viewers">
@@ -58,7 +59,7 @@ export function ViewersSheet({ items, showAvatars, onPick, onClose }: Props) {
           const name = it.nickname || it.memo?.nickname || it.uniqueId || it.userId;
           const handle = it.uniqueId || it.memo?.uniqueId;
           return (
-            <button key={it.userId} className={`vrow${it.memo ? ' has-memo' : ''}`} onClick={() => onPick(it)}>
+            <button key={it.userId} className={`vrow${hasMemoContent(it.memo) ? ' has-memo' : ''}${it.memo?.favorite ? ' fav' : ''}`} onClick={() => onPick(it)}>
               <Avatar url={it.avatarUrl} name={name} enabled={showAvatars} />
               <div className="body">
                 <div className="head">
