@@ -234,7 +234,7 @@ function StreamView({ memos, session, settings, stream, live, onBack }: StreamPr
           ) : filtered.length === 0 ? (
             <div className="empty">{query ? '一致する行がありません。' : 'この種類の行はありません。'}</div>
           ) : (
-            shown.map((r) => <FeedRowView key={r.id} row={r} note={memos.get(r.viewer.userId)?.note} previousNote={memos.get(r.viewer.userId)?.previousNote} kana={memos.get(r.viewer.userId)?.kana} showAvatars={settings.showAvatars} bigGiftDiamonds={settings.bigGiftDiamonds} />)
+            shown.map((r) => <FeedRowView key={r.id} row={r} note={memos.get(r.viewer.userId)?.note} previousNote={memos.get(r.viewer.userId)?.previousNote} kana={memos.get(r.viewer.userId)?.kana} favorite={memos.get(r.viewer.userId)?.favorite} showAvatars={settings.showAvatars} bigGiftDiamonds={settings.bigGiftDiamonds} />)
           )}
           {filtered.length > shown.length ? (
             <button className="btn more" onClick={() => setLimit((n) => n + PAGE)}>

@@ -138,7 +138,7 @@ export function Highlights({ session, generation, demo, memos, picked, onPick, s
             return (
               <button
                 key={v.userId}
-                className={`vrow hl-row${memo?.note || memo?.previousNote ? ' has-memo' : ''}`}
+                className={`vrow hl-row${memo?.note || memo?.previousNote ? ' has-memo' : ''}${memo?.favorite ? ' fav' : ''}`}
                 onClick={() => setTarget({ userId: v.userId, nickname: v.nickname, uniqueId: v.uniqueId, avatarUrl: v.avatarUrl, visits: row.visits, firstEver: row.firstEver })}
               >
                 <Avatar url={v.avatarUrl} name={name} enabled={showAvatars} />
@@ -175,6 +175,7 @@ export function Highlights({ session, generation, demo, memos, picked, onPick, s
           showAvatars={showAvatars}
           autoFocus={false}
           onSave={(patch) => session.setMemo(target.userId, patch, Date.now(), { real: !demo })}
+          onFavorite={(favorite) => session.setMemo(target.userId, { favorite, nickname: target.nickname, uniqueId: target.uniqueId }, Date.now(), { real: !demo })}
           onClose={() => setTarget(null)}
           history={<ActionHistory day={day} rows={history} />}
         />

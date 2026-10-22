@@ -10,7 +10,7 @@ import { BoundedSet, HighlightDay, actionKey, addLike, isAction, likeBucketStart
 import type { ArchiveBackup } from './backup';
 import type { FeedRow } from './feed';
 import type { VisitRecord } from './visits';
-import { MemoBook, type MemoPatch, type MemoRecord } from './memos';
+import { hasMemoContent, MemoBook, type MemoPatch, type MemoRecord } from './memos';
 import { EulerSocket, type SocketState } from './euler-socket';
 import { buildEulerUrl } from './euler-url';
 import type { Settings } from './settings';
@@ -857,7 +857,7 @@ export class LiveSession {
   // ── リスナーメモ ─────────────────────────────────────────────────
 
   /**
-   * メモを書く(3 項目すべて空なら削除)。デモの画面を出している間は使い捨て帳に書く。すぐ保存する。
+   * メモを書く(3 項目すべて空でお気に入りでもなければ削除)。お気に入りの付け外しも `{ favorite }` でここから。デモの画面を出している間は使い捨て帳に書く。すぐ保存する。
    * `real`: デモの帳が残っていても本物の帳に書く(デモが自然に終わり、ハイライトが本物の行を出しているとき)。
    */
   setMemo(userId: string, patch: MemoPatch, now = Date.now(), o: { real?: boolean } = {}): MemoRecord | null {
@@ -875,8 +875,11 @@ export class LiveSession {
     return (this.demoMemos ?? this.memos).get(userId);
   }
 
+  /** メモ・前回・よみがなを書いた人数(お気に入りだけの人は数えない)。 */
   get memoCount(): number {
-    return this.memos.size;
+    let n = 0;
+    for (const m of this.memos.view().values()) if (hasMemoContent(m)) n++;
+    return n;
   }
 
   /** リスナー一覧(来店履歴 + メモ)。最近来た順。来店履歴の無いメモだけの人は末尾。 */

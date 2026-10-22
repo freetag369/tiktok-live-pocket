@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { KANA_MAX_LEN, MEMO_MAX_LEN, type MemoPatch, type MemoRecord } from '../lib/memos';
+import { hasMemoContent, KANA_MAX_LEN, MEMO_MAX_LEN, type MemoPatch, type MemoRecord } from '../lib/memos';
 import { Avatar } from './Avatar';
 import { VisitBadge } from './Badges';
 
@@ -18,6 +18,8 @@ interface Props {
   current?: MemoRecord;
   showAvatars: boolean;
   onSave: (patch: MemoPatch) => void;
+  /** ★ を押したとき。メモの保存とは別に、押した時点ですぐ反映する。 */
+  onFavorite: (on: boolean) => void;
   onClose: () => void;
   /** メモ欄の下に出すもの(ハイライトのその日の履歴)。 */
   history?: React.ReactNode;
@@ -28,15 +30,17 @@ interface Props {
 /**
  * メモ編集のボトムシート。配信中に片手で書けるよう、画面下から出して メモ・前回・よみがなを入力する。
  * 保存したメモは次回以降の配信でも残り、その人の行(入室・コメント・ギフト)に表示される。
+ * 上の ★ でお気に入りにすると、その人の行の背景が青になる(★ は押した時点で保存。メモの削除では外れない)。
  */
-export function MemoSheet({ target, current, showAvatars, onSave, onClose, history, autoFocus = true }: Props) {
+export function MemoSheet({ target, current, showAvatars, onSave, onFavorite, onClose, history, autoFocus = true }: Props) {
   const [note, setNote] = useState(current?.note ?? '');
   const [previousNote, setPreviousNote] = useState(current?.previousNote ?? '');
   const [kana, setKana] = useState(current?.kana ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
   const name = target.nickname || current?.nickname || target.uniqueId || current?.uniqueId || target.userId;
   const handle = target.uniqueId || current?.uniqueId;
-  const has = Boolean(current);
+  const has = hasMemoContent(current);
+  const fav = Boolean(current?.favorite);
 
   useEffect(() => {
     if (!autoFocus) return;
@@ -72,6 +76,9 @@ export function MemoSheet({ target, current, showAvatars, onSave, onClose, histo
               </div>
             ) : null}
           </div>
+          <button className={`favbtn${fav ? ' on' : ''}`} aria-pressed={fav} onClick={() => onFavorite(!fav)}>
+            {fav ? '★' : '☆'} お気に入り
+          </button>
           <button className="iconbtn" onClick={onClose} aria-label="閉じる">
             ✕
           </button>
