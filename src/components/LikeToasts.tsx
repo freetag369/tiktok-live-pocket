@@ -1,5 +1,6 @@
 import { LIKE_BURST_MS, recentLikers, type LikeEntry } from '../lib/likes';
 import { num } from '../lib/format';
+import { displayName } from '../lib/names';
 import { Avatar } from './Avatar';
 import { useLiveTick } from './useLiveTick';
 
@@ -30,7 +31,7 @@ export function LikeToasts({ likes, likeCount, showAvatars }: Props) {
         .reverse()
         .map((e) => {
           const v = e.viewer;
-          const name = v.nickname || v.uniqueId || v.userId;
+          const name = displayName(v);
           return (
             <div key={e.userId} className="like-toast">
               <Avatar url={v.avatarUrl} name={name} enabled={showAvatars} />

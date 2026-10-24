@@ -5,6 +5,7 @@ import { hhmm, num, lastJoined } from '../lib/format';
 import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sortInteractions, type Interaction, type InteractionSort } from '../lib/interactions';
 import type { LikeEntry } from '../lib/likes';
 import { hasMemoContent, type MemoRecord } from '../lib/memos';
+import { displayName, handleOf } from '../lib/names';
 import type { LiveSession } from '../lib/session';
 import { Avatar } from './Avatar';
 import { RoleBadges, VisitBadge } from './Badges';
@@ -105,9 +106,8 @@ export function Interactions({ session, roomId, rows, likes, likeCount, screenEp
 
 function nameOf(it: Interaction, memo?: MemoRecord): { name: string; handle: string } {
   const v = it.viewer;
-  const name = v.nickname || memo?.nickname || v.uniqueId || memo?.uniqueId || it.userId;
-  const h = v.uniqueId || memo?.uniqueId;
-  return { name, handle: h && h !== name ? `@${h}` : '' };
+  const name = displayName(v, memo);
+  return { name, handle: handleOf(v, name, memo) };
 }
 
 /** 💬 🎁💎 ❤️ 🚪 ➕ の数。likeTime を付けると ❤️ に最後のいいね時刻も添える(人物シート用)。 */

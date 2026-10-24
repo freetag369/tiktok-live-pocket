@@ -3,6 +3,7 @@ import type { FeedRow, JoinRow } from '../lib/feed';
 import { hhmm, lastJoined } from '../lib/format';
 import { Avatar } from './Avatar';
 import { GradeBadge, VisitBadge } from './Badges';
+import { visibleName } from '../lib/names';
 
 /** 枠の見た目の行数(CSS の --dock-rows と合わせる)。 */
 export const DOCK_ROWS = 5;
@@ -17,9 +18,9 @@ interface Props {
   onTapRow?: (row: FeedRow) => void;
 }
 
-/** 固定枠の表示名: ニックネーム(TikTok の既定名 user + 数字もそのまま)。無ければ @ハンドル、それも無ければユーザー ID。 */
+/** 固定枠の表示名: ニックネーム(TikTok の既定名 user + 数字もそのまま)。描ける文字が無ければ @ハンドル、それも無ければユーザー ID。 */
 export function dockLabel(v: JoinRow['viewer']): string {
-  const nick = v.nickname?.trim();
+  const nick = visibleName(v.nickname);
   if (nick) return nick;
   return v.uniqueId ? `@${v.uniqueId}` : `ID ${v.userId}`;
 }

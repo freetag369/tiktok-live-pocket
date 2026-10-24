@@ -3,6 +3,7 @@ import type { MemoRecord } from '../lib/memos';
 import { MemoLines } from './MemoLines';
 import { LIKE_BURST_MS, rankLikes, recentLikers, type LikeEntry } from '../lib/likes';
 import { num } from '../lib/format';
+import { displayName, handleOf } from '../lib/names';
 import { Avatar } from './Avatar';
 import { VisitBadge } from './Badges';
 import { useLiveTick } from './useLiveTick';
@@ -49,7 +50,7 @@ export function LikeRanking({ memos, likes, likeCount, likeRoomTotal, showAvatar
               {live.map((e, i) => (
                 <span key={e.userId}>
                   {i > 0 ? '・' : ''}
-                  <span className="who">{e.viewer.nickname || e.viewer.uniqueId || e.userId}</span>
+                  <span className="who">{displayName(e.viewer)}</span>
                 </span>
               ))}
             </div>
@@ -65,8 +66,8 @@ export function LikeRanking({ memos, likes, likeCount, likeRoomTotal, showAvatar
 
 const LikeRankRow = memo(function LikeRankRow({ entry, userMemo, pos, live, showAvatars }: { entry: LikeEntry; userMemo?: MemoRecord; pos: number; live: boolean; showAvatars: boolean }) {
   const v = entry.viewer;
-  const name = v.nickname || v.uniqueId || v.userId;
-  const handle = v.uniqueId && v.uniqueId !== v.nickname ? `@${v.uniqueId}` : '';
+  const name = displayName(v);
+  const handle = handleOf(v, name);
   return (
     <div className={`rank-row${pos <= 3 ? ' top3' : ''}${live ? ' live' : ''}${userMemo?.favorite ? ' fav' : ''}`}>
       <span className="pos">{pos}</span>
