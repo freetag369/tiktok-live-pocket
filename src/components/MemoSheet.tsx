@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { hasMemoContent, KANA_MAX_LEN, MEMO_MAX_LEN, type MemoPatch, type MemoRecord } from '../lib/memos';
+import { displayName } from '../lib/names';
 import { Avatar } from './Avatar';
 import { VisitBadge } from './Badges';
 
@@ -37,7 +38,7 @@ export function MemoSheet({ target, current, showAvatars, onSave, onFavorite, on
   const [previousNote, setPreviousNote] = useState(current?.previousNote ?? '');
   const [kana, setKana] = useState(current?.kana ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
-  const name = target.nickname || current?.nickname || target.uniqueId || current?.uniqueId || target.userId;
+  const name = displayName(target, current);
   const handle = target.uniqueId || current?.uniqueId;
   const has = hasMemoContent(current);
   const fav = Boolean(current?.favorite);

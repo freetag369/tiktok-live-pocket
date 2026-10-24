@@ -5,6 +5,7 @@ import { num } from '../lib/format';
 import { japaneseGiftName } from '../lib/gift-names';
 import { actionKey, highlightMembers, japanDay, japanDayLabel, japanTime, pickHighlightDay, watchJapanDay } from '../lib/highlights';
 import type { MemoRecord } from '../lib/memos';
+import { displayName, handleOf } from '../lib/names';
 import { HIGHLIGHT_MEMORY_MAX, type LiveSession } from '../lib/session';
 import { Avatar } from './Avatar';
 import { MemoSheet, type MemoTarget } from './MemoSheet';
@@ -133,8 +134,8 @@ export function Highlights({ session, generation, demo, memos, picked, onPick, s
           members.slice(0, limit).map(({ row, comments, likes, follows, gifts }) => {
             const v = row.viewer;
             const memo = memos.get(v.userId);
-            const name = v.nickname || memo?.nickname || v.uniqueId || v.userId;
-            const handle = v.uniqueId && v.uniqueId !== name ? `@${v.uniqueId}` : '';
+            const name = displayName(v, memo);
+            const handle = handleOf(v, name);
             return (
               <button
                 key={v.userId}

@@ -5,6 +5,7 @@ import type { ViewerListItem } from '../lib/session';
 import { lastJoined } from '../lib/format';
 import { Avatar } from './Avatar';
 import { VisitBadge } from './Badges';
+import { displayName } from '../lib/names';
 
 interface Props {
   items: ViewerListItem[];
@@ -56,7 +57,7 @@ export function ViewersSheet({ items, showAvatars, onPick, onClose }: Props) {
       <div className="scroll viewers-list">
         {shown.length === 0 ? <div className="empty">{items.length === 0 ? '来店履歴がまだありません。配信を受信すると、ここに来た人が並びます。' : '該当する人がいません。'}</div> : null}
         {shown.map((it) => {
-          const name = it.nickname || it.memo?.nickname || it.uniqueId || it.userId;
+          const name = displayName(it, it.memo);
           const handle = it.uniqueId || it.memo?.uniqueId;
           return (
             <button key={it.userId} className={`vrow${hasMemoContent(it.memo) ? ' has-memo' : ''}${it.memo?.favorite ? ' fav' : ''}`} onClick={() => onPick(it)}>
