@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sortInteractions, type Interaction } from '../src/lib/interactions';
+import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sheetItems, sortInteractions, type Interaction } from '../src/lib/interactions';
 import type { FeedItem, FeedRow, RoomMark } from '../src/lib/feed';
 import type { LikeEntry } from '../src/lib/likes';
 import type { MemoRecord } from '../src/lib/memos';
@@ -111,5 +111,27 @@ describe('filterInteractions', () => {
   });
   it('空白だけなら全件(同じ配列)', () => {
     expect(filterInteractions(list, '  ', memos)).toBe(list);
+  });
+});
+
+describe('sheetItems', () => {
+  const likeRow = (id: string, userId: string, tsMs: number, count: number): FeedRow => ({ k: 'like', id, tsMs, viewer: { userId, nickname: `n${userId}` }, count, visits: 3, firstEver: false });
+  const base = (rows: FeedRow[], likes = 0, likeLastMs?: number): Interaction => ({ userId: 'a', viewer: { userId: 'a', nickname: 'na' }, comments: 1, gifts: 0, diamonds: 0, joins: 0, follows: 0, likes, lastMs: T, likeLastMs, visits: 3, firstEver: false, rows });
+
+  it('1 分ごとのいいね行を 1 本にまとめ、最後のいいねの位置に置く', () => {
+    const rows = [comment('c1', 'a', T), likeRow('l1', 'a', T + 60_000, 12), comment('c2', 'a', T + 90_000), likeRow('l2', 'a', T + 120_000, 30), comment('c3', 'a', T + 200_000)];
+    const items = sheetItems(base(rows, 42, T + 125_000));
+    expect(items.map((r) => (r.k === 'like-summary' ? 'LIKES' : r.id))).toEqual(['c1', 'c2', 'LIKES', 'c3']);
+    const sum = items[2]!;
+    expect(sum).toEqual({ k: 'like-summary', count: 42, firstMs: T + 60_000, lastMs: T + 125_000 });
+  });
+  it('受信中の累計が保存済みの合計より少なければ(読み直し後など)行の合計を使う', () => {
+    const items = sheetItems(base([likeRow('l1', 'a', T, 5), likeRow('l2', 'a', T + 60_000, 7)], 0));
+    expect(items).toEqual([{ k: 'like-summary', count: 12, firstMs: T, lastMs: T + 60_000 }]);
+  });
+  it('いいね行が無ければそのまま(ヘッダの ❤️ だけ)', () => {
+    const rows = [comment('c1', 'a', T), gift('g1', 'a', T + 1, 2)];
+    expect(sheetItems(base(rows, 9, T + 5))).toEqual(rows);
+    expect(sheetItems(base([], 9, T + 5))).toEqual([]);
   });
 });
