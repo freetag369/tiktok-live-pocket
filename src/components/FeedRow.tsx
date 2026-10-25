@@ -3,6 +3,7 @@ import { MemoLines } from './MemoLines';
 import type { FeedRow as Row } from '../lib/feed';
 import { hhmm, num, lastJoined } from '../lib/format';
 import { japaneseGiftName } from '../lib/gift-names';
+import { displayName } from '../lib/names';
 import { Avatar, GiftIcon } from './Avatar';
 import { GradeBadge, RoleBadges, VisitBadge } from './Badges';
 
@@ -25,7 +26,7 @@ export interface RowProps {
 
 export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGiftDiamonds, note, previousNote, kana, favorite, onTap, showPreviousJoined, previousJoinedMs }: RowProps) {
   const v = row.viewer;
-  const name = v.nickname || v.uniqueId || v.userId;
+  const name = displayName(v);
   const extra = `${row.firstEver ? ' first' : ''}${favorite ? ' fav' : ''}${note || previousNote ? ' has-memo' : ''}${onTap ? ' tappable' : ''}`;
   const click = onTap ? () => onTap(row) : undefined;
   const kanaEl = kana ? <span className="kana">({kana})</span> : null;

@@ -1,9 +1,10 @@
 import { memo, useState } from 'react';
+import { initialOf } from '../lib/names';
 
 export const Avatar = memo(function Avatar({ url, name, enabled }: { url?: string; name?: string; enabled: boolean }) {
   const [failed, setFailed] = useState(false);
   if (!enabled || !url || failed) {
-    return <div className="avatar ph">{(name || '?').slice(0, 1)}</div>;
+    return <div className="avatar ph">{initialOf(name)}</div>;
   }
   return <img className="avatar" src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 });

@@ -1,4 +1,5 @@
 import type { Viewer } from './events';
+import { visibleName } from './names';
 
 /**
  * フォロー通知ポップアップの表示状態(純関数)。
@@ -56,5 +57,5 @@ export function followToastLabel(names: string[]): string {
 
 /** 表示名: nickname → uniqueId → userId。 */
 export function followerName(v: Viewer): string {
-  return v.nickname?.trim() || v.uniqueId?.trim() || v.userId;
+  return visibleName(v.nickname) || v.uniqueId?.trim() || v.userId;
 }
