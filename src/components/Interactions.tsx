@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { MemoLines } from './MemoLines';
 import type { FeedItem, FeedRow } from '../lib/feed';
 import { hhmm, num, lastJoined } from '../lib/format';
-import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sortInteractions, type Interaction, type InteractionSort } from '../lib/interactions';
+import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sheetItems, sortInteractions, type Interaction, type InteractionSort, type LikeSummary } from '../lib/interactions';
 import type { LikeEntry } from '../lib/likes';
 import { hasMemoContent, type MemoRecord } from '../lib/memos';
 import { displayName, handleOf } from '../lib/names';
@@ -21,7 +21,8 @@ import type { MemoTarget } from './MemoSheet';
  *  - アーカイブはタブを開いたとき・🧹 のとき(screenEpoch)・配信が変わったときに読み直す。
  *  - 人物シートは一覧の上に重ねて出す(一覧はアンマウントしない)。戻ったとき一覧のスクロール位置が
  *    そのまま残り、見ていた人の行だけ scrollIntoView で見える位置に寄せる。
- *  - シート上で右スワイプすると一覧順で次の人、左スワイプで前の人へ即切り替え。
+ *  - シート上で左スワイプ(指が右→左)すると一覧順で次の人、右スワイプで前の人へ即切り替え。
+ *    人物シートでは 1 分ごとのいいね行を 1 本にまとめて出す(sheetItems)。
  */
 
 interface Props {
@@ -177,20 +178,22 @@ interface PersonProps {
   bigGiftDiamonds: number;
   onMemo: (target: MemoTarget) => void;
   onBack: () => void;
-  /** 右スワイプ(指が左→右)で呼ぶ。一覧順で次の人へ。 */
+  /** 左スワイプ(指が右→左。ページを送る向き)で呼ぶ。一覧順で次の人へ。 */
   onNext?: () => void;
-  /** 左スワイプで呼ぶ。前の人へ。 */
+  /** 右スワイプ(指が左→右)で呼ぶ。前の人へ。 */
   onPrev?: () => void;
 }
 
 /**
  * 1 人の履歴(全画面)。上に名前・バッジ・数・メモを 1 回だけ出し、コメントは「時刻 + 本文」だけの行、
- * ギフト・入室・フォローは本画面と同じ FeedRowView。行タップ・📝・下のボタンのどれでもメモが開く。
+ * ギフト・入室・フォローは本画面と同じ FeedRowView。アーカイブの 1 分ごとのいいね行は 1 本の行にまとめる。
+ * 行タップ・📝・下のボタンのどれでもメモが開く。
  * 横スワイプは指を離すのを待たず、判定が付いた瞬間に onNext / onPrev を 1 回だけ呼ぶ。
  */
 export function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack, onNext, onPrev }: PersonProps) {
   const { name, handle } = nameOf(it, memo);
   const openMemo = () => onMemo(targetOf(it));
+  const items = useMemo(() => sheetItems(it), [it]);
 
   // 1 本指の開始点と「この指ではもう発火した」印。描画には関わらないので ref。
   const touch = useRef<{ x: number; y: number; done: boolean } | null>(null);
@@ -210,7 +213,7 @@ export function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, on
     const dir = judgeSwipe(s, t.clientX, t.clientY);
     if (!dir) return;
     s.done = true;
-    if (dir === 'right') onNext?.();
+    if (dir === 'left') onNext?.();
     else onPrev?.();
   };
   const onTouchEnd = () => {
@@ -251,11 +254,13 @@ export function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, on
       {memo?.previousNote ? <button className="memo-line" onClick={openMemo}>前回：{memo.previousNote}</button> : null}
       <div className="feed archive">
         <div className="feed-inner">
-          {it.rows.length === 0 ? (
+          {items.length === 0 ? (
             <div className="empty">この配信ではいいねだけです。</div>
           ) : (
-            it.rows.map((r) =>
-              r.k === 'comment' ? (
+            items.map((r) =>
+              r.k === 'like-summary' ? (
+                <LikeLine key="likes" sum={r} onTap={openMemo} />
+              ) : r.k === 'comment' ? (
                 <CommentLine key={r.id} row={r} onTap={openMemo} />
               ) : (
                 <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={memo?.note} previousNote={memo?.previousNote} kana={memo?.kana || undefined} favorite={memo?.favorite} onTap={openMemo} />
@@ -279,6 +284,17 @@ function CommentLine({ row, onTap }: { row: Extract<FeedRow, { k: 'comment' }>; 
     <div className="row cline tappable" data-id={row.id} onClick={onTap}>
       <time>{hhmm(row.tsMs)}</time>
       <span className="text">{row.text}</span>
+    </div>
+  );
+}
+
+/** いいねをまとめた 1 行。回数と、最初〜最後の時刻(同じ分なら 1 つ)。 */
+function LikeLine({ sum, onTap }: { sum: LikeSummary; onTap: () => void }) {
+  const span = hhmm(sum.firstMs) === hhmm(sum.lastMs) ? hhmm(sum.lastMs) : `${hhmm(sum.firstMs)}〜${hhmm(sum.lastMs)}`;
+  return (
+    <div className="row cline likeline tappable" onClick={onTap}>
+      <time>{span}</time>
+      <span className="text">❤️ いいね ×{num(sum.count)}</span>
     </div>
   );
 }

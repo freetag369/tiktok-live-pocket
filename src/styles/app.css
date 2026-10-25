@@ -1353,6 +1353,11 @@ img {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* 人物シートのいいね 1 行(1 分ごとの行をまとめたもの) */
+.row.cline.likeline .text {
+  color: var(--pink);
+  font-variant-numeric: tabular-nums;
+}
 .person-head .memo-line {
   display: block;
   width: 100%;

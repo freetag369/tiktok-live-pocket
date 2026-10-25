@@ -67,6 +67,18 @@ describe('やり取りの人物シート', () => {
     expect(render(person, memo).split('前回：ギフトのお礼').length - 1).toBe(3);
   });
 
+  it('アーカイブの 1 分ごとのいいね行は 1 行にまとめ、名前つきの「がいいね」行は出さない', () => {
+    const likeRow = (id: string, tsMs: number, count: number): FeedRow => ({ k: 'like', id, tsMs, viewer, count, visits: 3, firstEver: false });
+    const withLikes = render({ ...person, likes: 40, likeLastMs: T + 130_000, rows: [...rows, likeRow('l1', T + 60_000, 10), likeRow('l2', T + 120_000, 25), likeRow('l3', T + 125_000, 5)] });
+    expect(withLikes).not.toContain('がいいね');
+    expect(withLikes.split('likeline').length - 1).toBe(1);
+    expect(withLikes).toContain(`<time>${hhmm(T + 60_000)}〜${hhmm(T + 130_000)}</time><span class="text">❤️ いいね ×40</span>`);
+    // 同じ分なら時刻は 1 つ
+    const oneMinute = render({ ...person, likes: 3, likeLastMs: T + 10_000, rows: [likeRow('l1', T + 10_000, 3)] });
+    expect(oneMinute).toContain(`<time>${hhmm(T + 10_000)}</time><span class="text">❤️ いいね ×3</span>`);
+    expect(oneMinute).not.toContain('この配信ではいいねだけです。');
+  });
+
   it('行が無ければ「いいねだけ」と出る', () => {
     expect(render({ ...person, rows: [], comments: 0, gifts: 0, diamonds: 0, follows: 0 })).toContain('この配信ではいいねだけです。');
   });

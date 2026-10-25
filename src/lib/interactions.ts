@@ -10,6 +10,7 @@ import type { MemoRecord } from './memos';
  *  - 行は 画面の履歴(最後の「新しい配信」区切り以降)+ アーカイブ(🧹 で消えた分・入室上限で
  *    落ちた分の補い)を id で重複排除して使う。画面側が新しい(連打の ×N)ので画面側を優先。
  *  - いいねは行にならない(FeedState.likes の人ごと累計)ので、taps と lastMs だけを足す。
+ *    アーカイブから来る 1 分ごとのいいね行(k: 'like')は rows に残るが、人物シートでは sheetItems が 1 本にまとめる。
  */
 
 export interface Interaction {
@@ -116,6 +117,45 @@ export function buildInteractions(rows: FeedRow[], likes: ReadonlyMap<string, Li
   const out: Interaction[] = [];
   for (const it of map.values()) if (it.comments > 0 || it.gifts > 0 || it.likes > 0) out.push(it);
   return out;
+}
+
+/** 人物シートに出す「いいね」の 1 行。1 分ごとの行を足し合わせたもの。 */
+export interface LikeSummary {
+  k: 'like-summary';
+  /** タップ数。受信中の累計(likes)と保存済みの行の合計の大きい方。 */
+  count: number;
+  /** 最初のいいね行の時刻。 */
+  firstMs: number;
+  /** 最後のいいね(行か likeLastMs の新しい方)。 */
+  lastMs: number;
+}
+
+export type SheetItem = FeedRow | LikeSummary;
+
+/**
+ * 人物シートに並べる行。1 分ごとのいいね行(アーカイブ由来)は 1 本の LikeSummary にまとめ、
+ * 最後のいいねの時刻の位置に置く。いいね行が無ければ rows をそのまま返す(ヘッダに ❤️ の数は別に出る)。
+ */
+export function sheetItems(it: Interaction): SheetItem[] {
+  const out: FeedRow[] = [];
+  let count = 0;
+  let firstMs = Infinity;
+  let lastMs = -Infinity;
+  for (const r of it.rows) {
+    if (r.k !== 'like') {
+      out.push(r);
+      continue;
+    }
+    count += r.count;
+    firstMs = Math.min(firstMs, r.tsMs);
+    lastMs = Math.max(lastMs, r.tsMs);
+  }
+  if (!Number.isFinite(firstMs)) return out;
+  const sum: LikeSummary = { k: 'like-summary', count: Math.max(count, it.likes), firstMs, lastMs: Math.max(lastMs, it.likeLastMs ?? 0) };
+  // rows は時刻順なので、最後のいいねより後の行の手前に差し込む
+  let at = out.length;
+  while (at > 0 && out[at - 1]!.tsMs > sum.lastMs) at--;
+  return [...out.slice(0, at), sum, ...out.slice(at)];
 }
 
 function byUserId(a: Interaction, b: Interaction): number {
