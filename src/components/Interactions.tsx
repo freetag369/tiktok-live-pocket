@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MemoLines } from './MemoLines';
 import type { FeedItem, FeedRow } from '../lib/feed';
 import { hhmm, num, lastJoined } from '../lib/format';
@@ -6,6 +6,7 @@ import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sort
 import type { LikeEntry } from '../lib/likes';
 import { hasMemoContent, type MemoRecord } from '../lib/memos';
 import type { LiveSession } from '../lib/session';
+import { judgeSwipe } from '../lib/swipe';
 import { Avatar } from './Avatar';
 import { RoleBadges, VisitBadge } from './Badges';
 import { FeedRowView } from './FeedRow';
@@ -17,6 +18,9 @@ import type { MemoTarget } from './MemoSheet';
  *
  *  - 行は 画面の履歴(最後の区切り以降)+ アーカイブ(🧹 で消えた分の補い)。いいねは FeedState.likes。
  *  - アーカイブはタブを開いたとき・🧹 のとき(screenEpoch)・配信が変わったときに読み直す。
+ *  - 人物シートは一覧の上に重ねて出す(一覧はアンマウントしない)。戻ったとき一覧のスクロール位置が
+ *    そのまま残り、見ていた人の行だけ scrollIntoView で見える位置に寄せる。
+ *  - シート上で右スワイプすると一覧順で次の人、左スワイプで前の人へ即切り替え。
  */
 
 interface Props {
@@ -44,6 +48,7 @@ export function Interactions({ session, roomId, rows, likes, likeCount, screenEp
   const [sort, setSort] = useState<InteractionSort>('recent');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!roomId) return;
@@ -67,39 +72,51 @@ export function Interactions({ session, roomId, rows, likes, likeCount, screenEp
     if (open && !person) setOpen(null);
   }, [open, person]);
 
-  if (person) {
-    return <PersonSheet it={person} memo={memos.get(person.userId)} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} onMemo={onMemo} onBack={() => setOpen(null)} />;
-  }
+  /** 一覧(並び順・絞り込み後)での隣の人へ。端や、絞り込みで一覧に居ない人からは動かない。 */
+  const step = (d: 1 | -1) => {
+    const idx = list.findIndex((i) => i.userId === open);
+    const next = idx >= 0 ? list[idx + d] : undefined;
+    if (next) setOpen(next.userId);
+  };
+
+  /** シートを閉じる。一覧は残っているので、見ていた人の行が隠れていたら見える所まで寄せてから戻す。 */
+  const close = () => {
+    if (open) listRef.current?.querySelector<HTMLElement>(`[data-uid=${JSON.stringify(open)}]`)?.scrollIntoView({ block: 'nearest' });
+    setOpen(null);
+  };
 
   return (
-    <div className="people">
-      {all.length === 0 ? (
-        <div className="empty">{empty}</div>
-      ) : (
-        <>
-          <div className="people-tools">
-            <div className="seg" role="tablist" aria-label="並び順">
-              <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>
-                新しい順
-              </button>
-              <button className={sort === 'most' ? 'on' : ''} onClick={() => setSort('most')}>
-                多い順
-              </button>
+    <>
+      {person ? <PersonSheet key={person.userId} it={person} memo={memos.get(person.userId)} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} onMemo={onMemo} onBack={close} onNext={() => step(1)} onPrev={() => step(-1)} /> : null}
+      <div className="people">
+        {all.length === 0 ? (
+          <div className="empty">{empty}</div>
+        ) : (
+          <>
+            <div className="people-tools">
+              <div className="seg" role="tablist" aria-label="並び順">
+                <button className={sort === 'recent' ? 'on' : ''} onClick={() => setSort('recent')}>
+                  新しい順
+                </button>
+                <button className={sort === 'most' ? 'on' : ''} onClick={() => setSort('most')}>
+                  多い順
+                </button>
+              </div>
+              <input type="search" inputMode="search" placeholder="名前・@・メモ・前回で絞り込み" value={query} autoCapitalize="none" autoCorrect="off" onChange={(e) => setQuery(e.target.value)} />
             </div>
-            <input type="search" inputMode="search" placeholder="名前・@・メモ・前回で絞り込み" value={query} autoCapitalize="none" autoCorrect="off" onChange={(e) => setQuery(e.target.value)} />
-          </div>
-          <p className="note people-count">
-            {num(all.length)} 人{list.length !== all.length ? ` · 絞り込み ${num(list.length)} 人` : ''}。タップすると履歴とメモ。
-          </p>
-          <div className="people-list">
-            {list.length === 0 ? <div className="empty">該当する人がいません。</div> : null}
-            {list.map((it) => (
-              <PersonRow key={it.userId} previousJoinedMs={session.previousJoinedFor(it.userId)} it={it} memo={memos.get(it.userId)} showAvatars={showAvatars} onPick={() => setOpen(it.userId)} />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+            <p className="note people-count">
+              {num(all.length)} 人{list.length !== all.length ? ` · 絞り込み ${num(list.length)} 人` : ''}。タップすると履歴とメモ。
+            </p>
+            <div className="people-list" ref={listRef}>
+              {list.length === 0 ? <div className="empty">該当する人がいません。</div> : null}
+              {list.map((it) => (
+                <PersonRow key={it.userId} previousJoinedMs={session.previousJoinedFor(it.userId)} it={it} memo={memos.get(it.userId)} showAvatars={showAvatars} onPick={() => setOpen(it.userId)} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -135,7 +152,7 @@ function Counts({ it, likeTime }: { it: Interaction; likeTime?: boolean }) {
 function PersonRow({ it, memo, showAvatars, onPick, previousJoinedMs }: { previousJoinedMs?: number; it: Interaction; memo?: MemoRecord; showAvatars: boolean; onPick: () => void }) {
   const { name, handle } = nameOf(it, memo);
   return (
-    <button className={`vrow prow${hasMemoContent(memo) ? ' has-memo' : ''}${memo?.favorite ? ' fav' : ''}`} onClick={onPick}>
+    <button className={`vrow prow${hasMemoContent(memo) ? ' has-memo' : ''}${memo?.favorite ? ' fav' : ''}`} data-uid={it.userId} onClick={onPick}>
       <Avatar url={it.viewer.avatarUrl} name={name} enabled={showAvatars} />
       <div className="body">
         <div className="head">
@@ -160,17 +177,48 @@ interface PersonProps {
   bigGiftDiamonds: number;
   onMemo: (target: MemoTarget) => void;
   onBack: () => void;
+  /** 右スワイプ(指が左→右)で呼ぶ。一覧順で次の人へ。 */
+  onNext?: () => void;
+  /** 左スワイプで呼ぶ。前の人へ。 */
+  onPrev?: () => void;
 }
 
 /**
  * 1 人の履歴(全画面)。上に名前・バッジ・数・メモを 1 回だけ出し、コメントは「時刻 + 本文」だけの行、
  * ギフト・入室・フォローは本画面と同じ FeedRowView。行タップ・📝・下のボタンのどれでもメモが開く。
+ * 横スワイプは指を離すのを待たず、判定が付いた瞬間に onNext / onPrev を 1 回だけ呼ぶ。
  */
-export function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack }: PersonProps) {
+export function PersonSheet({ it, memo, showAvatars, bigGiftDiamonds, onMemo, onBack, onNext, onPrev }: PersonProps) {
   const { name, handle } = nameOf(it, memo);
   const openMemo = () => onMemo(targetOf(it));
+
+  // 1 本指の開始点と「この指ではもう発火した」印。描画には関わらないので ref。
+  const touch = useRef<{ x: number; y: number; done: boolean } | null>(null);
+  const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    touch.current = null;
+    if (e.touches.length !== 1) return;
+    // バッジ行が横にスクロールする状態なら、そこから始まった指は横スクロールに譲る
+    const strip = (e.target as Element | null)?.closest?.('.person-summary');
+    if (strip && strip.scrollWidth > strip.clientWidth) return;
+    const t = e.touches[0]!;
+    touch.current = { x: t.clientX, y: t.clientY, done: false };
+  };
+  const onTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    const s = touch.current;
+    if (!s || s.done || e.touches.length !== 1) return;
+    const t = e.touches[0]!;
+    const dir = judgeSwipe(s, t.clientX, t.clientY);
+    if (!dir) return;
+    s.done = true;
+    if (dir === 'right') onNext?.();
+    else onPrev?.();
+  };
+  const onTouchEnd = () => {
+    touch.current = null;
+  };
+
   return (
-    <div className="sheet person">
+    <div className="sheet person" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
       <header className="header">
         <button className="iconbtn" onClick={onBack} aria-label="戻る">
           ‹
