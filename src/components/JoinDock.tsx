@@ -9,7 +9,7 @@ import { visibleName } from '../lib/names';
 export const DOCK_ROWS = 5;
 
 interface Props {
-  /** 入室(古い順)。feed.ts の dockJoins で絞ったもの(既定名 user + 数字 のままでメモも無い人だけ)。 */
+  /** 入室(古い順)。feed.ts の dockJoins で絞ったもの(メモ・前回・よみがなの無い人だけ)。 */
   rows: JoinRow[];
   showAvatars: boolean;
   previousJoinedFor?: (userId: string) => number | undefined;
@@ -27,7 +27,7 @@ export function dockLabel(v: JoinRow['viewer']): string {
 
 /**
  * 画面の一番下に固定する「入室」の枠。すべて・コメントタブに出す。
- * ニックネームが既定名(user + 数字)のままでメモも無い人の入室だけをここに出し、ニックネーム持ち・メモ持ちの入室は上のフィードに緑タグで流す(目立たせるため)。
+ * メモ・前回・よみがなのどれも書いていない人の入室だけをここに(名前付きで)出し、書いてある人の入室は上のフィードに緑タグで流す(目立たせるため)。
  * 上のフィードとは別の固定カテゴリで、高さは入室 5 行ぶん。新着は下に積まれ、古い分は枠の中を上へスクロールして見る。
  * 行はコンパクト(1 行)にして、名前・回数(初見)・前回入室・時刻だけ出す(タップでメモのシートが開く)。
  */

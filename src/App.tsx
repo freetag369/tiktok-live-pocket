@@ -110,8 +110,8 @@ export function App() {
 
   const f = snap.feed;
   const hasRows = f.rows.some((r) => r.k !== 'room');
-  // 下の固定枠(入室)。「すべて」「コメント」タブに出す。既定名(user + 数字)のままでメモも無い人の入室は枠へ、
-  // ニックネーム持ち・メモ持ちの入室は上のフィードへ(FeedList の keepJoin と同じ判定)。
+  // 下の固定枠(入室)。「すべて」「コメント」タブに出す。メモ・前回・よみがなの無い人の入室は枠へ(名前付き)、
+  // どれかを書いてある人の入室は上のフィードへ緑タグで(FeedList の keepJoin と同じ判定)。
   const dockTab = tab === 'all' || tab === 'comment' ? tab : null;
   const docked = dockTab !== null;
   const memoJoin = useCallback((r: JoinRow) => featuredJoin(r.viewer, snap.memos.get(r.viewer.userId)), [snap.memos]);

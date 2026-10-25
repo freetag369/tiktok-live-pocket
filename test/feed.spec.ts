@@ -335,16 +335,17 @@ describe('タブと配信の区切り(filterRows)', () => {
     expect(dockJoins(s.rows, 'all', 1, hasMemo).map((r) => r.id)).toEqual(['j2']);
   });
 
-  it('上に流す入室(featuredJoin): ニックネームを付けている人、またはメモ持ち。既定名でメモ無しだけ枠', () => {
+  it('上に流す入室(featuredJoin): メモ・前回・よみがなのどれかがある人だけ。名前の有無では分けない', () => {
     const memo = { userId: 'x', note: '常連', kana: '', updatedMs: NOW };
     const kanaOnly = { userId: 'x', note: '', kana: 'たろう', updatedMs: NOW };
+    const prevOnly = { userId: 'x', note: '', kana: '', previousNote: 'お礼', updatedMs: NOW };
     const favOnly = { userId: 'x', note: '', kana: '', favorite: true as const, updatedMs: NOW };
-    expect(featuredJoin({ userId: 'u', nickname: 'たろう' }, undefined)).toBe(true);
+    expect(featuredJoin({ userId: 'u', nickname: 'たろう' }, undefined)).toBe(false);
     expect(featuredJoin({ userId: 'u', nickname: 'user28420669859' }, undefined)).toBe(false);
-    expect(featuredJoin({ userId: 'u', nickname: 'user28420669859' }, memo)).toBe(true);
+    expect(featuredJoin({ userId: 'u', nickname: 'たろう' }, memo)).toBe(true);
     expect(featuredJoin({ userId: 'u', nickname: 'user28420669859' }, kanaOnly)).toBe(true);
+    expect(featuredJoin({ userId: 'u', nickname: 'user28420669859' }, prevOnly)).toBe(true);
     expect(featuredJoin({ userId: 'u', nickname: 'user28420669859' }, favOnly)).toBe(false);
-    expect(featuredJoin({ userId: 'u', uniqueId: 'handle_only' }, undefined)).toBe(false);
   });
 
   it('入室しか無いタブは上が空(「まだ何も届いていません」)になり、枠には出る', () => {
