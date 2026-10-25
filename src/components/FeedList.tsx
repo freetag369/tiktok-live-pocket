@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { countAfter, filterRows, firstRowsPerRoom, reconcileWindow, tailWindow, type FeedItem, type FeedRow, type Tab } from '../lib/feed';
+import { countAfter, featuredJoin, filterRows, firstRowsPerRoom, reconcileWindow, tailWindow, type FeedItem, type FeedRow, type Tab } from '../lib/feed';
 import { dateRange, num } from '../lib/format';
-import { hasMemoContent, type MemoRecord } from '../lib/memos';
+import type { MemoRecord } from '../lib/memos';
 import { FeedRowView } from './FeedRow';
 
 export { filterRows, type Tab };
@@ -23,7 +23,7 @@ interface Props {
   memos: ReadonlyMap<string, MemoRecord>;
   onTapRow?: (row: FeedRow) => void;
   previousJoinedFor?: (userId: string) => number | undefined;
-  /** 下の固定枠(JoinDock)が入室を出しているタブ。メモ・前回・よみがなの無い入室は上に流さず枠に出し、ある人の入室だけ上に流す。 */
+  /** 下の固定枠(JoinDock)が入室を出しているタブ。既定名(user + 数字)のままでメモも無い人の入室は上に流さず枠に出し、それ以外の入室は上に流す。 */
   docked?: boolean;
 }
 
@@ -93,13 +93,16 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
   const anchor = useRef<{ id: string; top: number } | null>(null);
   const [, bump] = useState(0);
 
-  // 枠のあるタブでは、メモ・前回・よみがなの無い入室は上に並べず下の固定枠(JoinDock)に出す。ある人の入室は上に流す。
+  // 枠のあるタブでは、既定名のままでメモも無い人の入室は上に並べず下の固定枠(JoinDock)に出す。ニックネーム持ち・メモ持ちの入室は上に流す。
   const items = useMemo(
-    () => filterRows(rows, tab, docked ? { dropJoins: true, keepJoin: (r) => hasMemoContent(memos.get(r.viewer.userId)) } : undefined),
+    () => filterRows(rows, tab, docked ? { dropJoins: true, keepJoin: (r) => featuredJoin(r.viewer, memos.get(r.viewer.userId)) } : undefined),
     [rows, tab, docked, memos],
   );
   // 「前回」メモは、その配信でその人が最初に現れた行にだけ出す(毎行は出さない)。
+  // 「前回入室：」も入室の行と、その人の最初の行(入室が届かなかった人のコメント等)にだけ出す。
   const firstIds = useMemo(() => firstRowsPerRoom(items), [items]);
+  // コメントタブではメモ(📝・前回)も前回入室も出さない(コメントの行にも、上に流れる入室の行にも)。
+  const quiet = tab === 'comment';
 
   let shown: FeedItem[];
   let hiddenBefore: number;
@@ -204,7 +207,9 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
             );
           }
           const m = memos.get(r.viewer.userId);
-          return <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={m?.note} previousNote={firstIds.has(r.id) ? m?.previousNote : undefined} kana={m?.kana || undefined} favorite={m?.favorite} onTap={onTapRow} showPreviousJoined={!!previousJoinedFor} previousJoinedMs={previousJoinedFor?.(r.viewer.userId)} />;
+          const first = firstIds.has(r.id);
+          const joined = !quiet && !!previousJoinedFor && (r.k === 'join' || first);
+          return <FeedRowView key={r.id} row={r} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} note={quiet ? undefined : m?.note} previousNote={!quiet && first ? m?.previousNote : undefined} kana={m?.kana || undefined} favorite={m?.favorite} onTap={onTapRow} showPreviousJoined={joined} previousJoinedMs={joined ? previousJoinedFor(r.viewer.userId) : undefined} />;
         })}
       </div>
       {!pinned && unseen > 0 ? (

@@ -175,6 +175,8 @@ export function Highlights({ session, generation, demo, memos, picked, onPick, s
           current={memos.get(target.userId)}
           showAvatars={showAvatars}
           autoFocus={false}
+          showPreviousJoined
+          previousJoinedMs={session.previousJoinedFor(target.userId)}
           onSave={(patch) => session.setMemo(target.userId, patch, Date.now(), { real: !demo })}
           onFavorite={(favorite) => session.setMemo(target.userId, { favorite, nickname: target.nickname, uniqueId: target.uniqueId }, Date.now(), { real: !demo })}
           onClose={() => setTarget(null)}

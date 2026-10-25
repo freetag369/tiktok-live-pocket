@@ -7,6 +7,7 @@ import {
   createFeedState,
   dataRows,
   enterRoom,
+  featuredJoin,
   FEED_KEEP_JOINS,
   filterRows,
   firstRowsPerRoom,
@@ -334,12 +335,65 @@ describe('タブと配信の区切り(filterRows)', () => {
     expect(dockJoins(s.rows, 'all', 1, hasMemo).map((r) => r.id)).toEqual(['j2']);
   });
 
+  it('上に流す入室(featuredJoin): ニックネームを付けている人、またはメモ持ち。既定名でメモ無しだけ枠', () => {
+    const memo = { userId: 'x', note: '常連', kana: '', updatedMs: NOW };
+    const kanaOnly = { userId: 'x', note: '', kana: 'たろう', updatedMs: NOW };
+    const favOnly = { userId: 'x', note: '', kana: '', favorite: true as const, updatedMs: NOW };
+    expect(featuredJoin({ userId: 'u', nickname: 'たろう' }, undefined)).toBe(true);
+    expect(featuredJoin({ userId: 'u', nickname: 'user28420669859' }, undefined)).toBe(false);
+    expect(featuredJoin({ userId: 'u', nickname: 'user28420669859' }, memo)).toBe(true);
+    expect(featuredJoin({ userId: 'u', nickname: 'user28420669859' }, kanaOnly)).toBe(true);
+    expect(featuredJoin({ userId: 'u', nickname: 'user28420669859' }, favOnly)).toBe(false);
+    expect(featuredJoin({ userId: 'u', uniqueId: 'handle_only' }, undefined)).toBe(false);
+  });
+
   it('入室しか無いタブは上が空(「まだ何も届いていません」)になり、枠には出る', () => {
     let s = createFeedState();
     s = enterRoom(s, 'r1', { now: NOW });
     s = applyEvent(s, { kind: 'join', msgId: 'j1', tsMs: NOW + 1, viewer: { userId: 'u1', nickname: 'たろう' }, action: 1 }, meta);
     expect(filterRows(s.rows, 'all', { dropJoins: true })).toEqual([]);
     expect(dockJoins(s.rows, 'all')).toHaveLength(1);
+  });
+});
+
+describe('配信内の入室回数(nth)', () => {
+  const join = (id: string, userId: string, tsMs: number): NormalizedEvent => ({ kind: 'join', msgId: id, tsMs, viewer: { userId, nickname: 'n' }, action: 1 });
+
+  it('同じ人の入室は 1, 2, 3 と増え、10 秒内の重複は数えず、配信が変わると 1 から', () => {
+    let s = createFeedState();
+    s = enterRoom(s, 'r1', { now: NOW });
+    s = applyEvent(s, join('a1', 'a', NOW), meta);
+    s = applyEvent(s, join('a1-dup', 'a', NOW + JOIN_DEDUPE_MS - 1), meta);
+    s = applyEvent(s, join('b1', 'b', NOW + 1000), meta);
+    s = applyEvent(s, join('a2', 'a', NOW + 60_000), meta);
+    s = applyEvent(s, join('a3', 'a', NOW + 120_000), meta);
+    const nth = (id: string) => (s.rows.find((r) => r.id === id) as Extract<FeedItem, { k: 'join' }>).nth;
+    expect([nth('a1'), nth('b1'), nth('a2'), nth('a3')]).toEqual([1, 1, 2, 3]);
+    expect(s.rows.some((r) => r.id === 'a1-dup')).toBe(false);
+    expect(s.joinNth.get('a')).toBe(3);
+    // 🧹 で行を消しても同じ配信の続きなので数は続く
+    s = clearRows(s);
+    s = applyEvent(s, join('a4', 'a', NOW + 180_000), meta);
+    expect(nth('a4')).toBe(4);
+    s = enterRoom(s, 'r2', { now: NOW + 200_000 });
+    expect(s.joinNth.size).toBe(0);
+    s = applyEvent(s, join('a5', 'a', NOW + 200_001), meta);
+    expect(nth('a5')).toBe(1);
+  });
+
+  it('画面の履歴の復元では最後の配信の入室行の nth から組み直す', () => {
+    const items: ScreenItem[] = [
+      { k: 'join', id: 'old', tsMs: NOW, viewer: { userId: 'a' }, visits: 1, firstEver: true, nth: 5, roomId: 'r1', seq: 1 },
+      { k: 'room', id: 'room:r2', tsMs: NOW + 1, roomId: 'r2', seq: 2 },
+      { k: 'join', id: 'a1', tsMs: NOW + 2, viewer: { userId: 'a' }, visits: 2, firstEver: false, nth: 1, roomId: 'r2', seq: 3 },
+      { k: 'join', id: 'a2', tsMs: NOW + 3, viewer: { userId: 'a' }, visits: 2, firstEver: false, nth: 2, roomId: 'r2', seq: 4 },
+      { k: 'join', id: 'b1', tsMs: NOW + 4, viewer: { userId: 'b' }, visits: 1, firstEver: true, roomId: 'r2', seq: 5 },
+    ];
+    let { state: s } = restoreFeed(items, null);
+    expect(s.joinNth.get('a')).toBe(2);
+    expect(s.joinNth.get('b')).toBe(1);
+    s = applyEvent(s, join('a3', 'a', NOW + 60_000), meta);
+    expect((s.rows[s.rows.length - 1] as Extract<FeedItem, { k: 'join' }>).nth).toBe(3);
   });
 });
 

@@ -33,6 +33,18 @@ export interface Named {
 }
 
 /**
+ * TikTok の既定ニックネーム(未設定のまま = `user` + 数字)。
+ * 実配信ではニックネームが空で届くことは無く、未設定の人はこの形で届く(PC 版 DB 2,953 人中 25 人)。
+ */
+const DEFAULT_NICKNAME = /^user\d{6,}$/i;
+
+/** 自分でニックネームを付けている人(描ける名前があり、既定名 `user12345678…` のままではない)。 */
+export function hasOwnNickname(v: Pick<Named, 'nickname'>): boolean {
+  const nick = visibleName(v.nickname);
+  return !!nick && !DEFAULT_NICKNAME.test(nick.trim());
+}
+
+/**
  * 表示名: 描けるニックネーム → メモに残したニックネーム → @ハンドル(素のまま)→ ユーザー ID。
  * フィード・ランキング・一覧・シートで共通。固定枠の `@` / `ID` 付きは dockLabel。
  */
