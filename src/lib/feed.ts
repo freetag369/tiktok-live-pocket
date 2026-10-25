@@ -1,5 +1,7 @@
 import type { GiftEvent, NormalizedEvent, Viewer } from './events';
 import { touchLike, type LikeEntry } from './likes';
+import { hasMemoContent, type MemoRecord } from './memos';
+import { hasOwnNickname } from './names';
 
 /** 画面に並ぶ 1 行。UI はこれだけを描く。 */
 export type FeedRow =
@@ -19,6 +21,8 @@ export type FeedRow =
       viewer: Viewer;
       visits: number;
       firstEver: boolean;
+      /** その配信で何回目の入室か(1 始まり)。無ければ 1 回目扱い(旧データ・アーカイブ)。 */
+      nth?: number;
     }
   | {
       k: 'gift';
@@ -84,6 +88,8 @@ export interface FeedState {
   streaks: Map<string, { rowId: string; counted: number }>;
   /** 直近の入室時刻: userId → tsMs(MemberMessage と Barrage の両方が届いたときの二重表示防止)。 */
   lastJoin: Map<string, number>;
+  /** この配信での入室回数: userId → 回数(行の nth。配信が変わるとリセット)。 */
+  joinNth: Map<string, number>;
   /** この配信の累計💎(tick ごとの差分で積むので、最後の repeatEnd が欠けても正しい)。 */
   diamonds: number;
   giftCount: number;
@@ -120,6 +126,7 @@ export function createFeedState(): FeedState {
     seenOrder: [],
     streaks: new Map(),
     lastJoin: new Map(),
+    joinNth: new Map(),
     diamonds: 0,
     giftCount: 0,
     commentCount: 0,
@@ -244,6 +251,9 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         for (const [id, ts] of lastJoin) if (ts < cutoff) lastJoin.delete(id);
       }
       lastJoin.set(e.viewer.userId, e.tsMs);
+      const joinNth = new Map(s.joinNth);
+      const nth = (joinNth.get(e.viewer.userId) ?? 0) + 1;
+      joinNth.set(e.viewer.userId, nth);
       const row: FeedRow = {
         k: 'join',
         id: e.msgId,
@@ -251,8 +261,9 @@ export function applyEvent(s: FeedState, e: NormalizedEvent, meta: ViewerMeta, i
         viewer: e.viewer,
         visits: meta.visits,
         firstEver: meta.firstEver,
+        nth,
       };
-      return { ...s, ...push(s, row), lastJoin, joinCount: s.joinCount + 1, lastTouched: row };
+      return { ...s, ...push(s, row), lastJoin, joinNth, joinCount: s.joinCount + 1, lastTouched: row };
     }
 
     case 'social': {
@@ -353,6 +364,14 @@ export type JoinRow = Extract<FeedRow, { k: 'join' }>;
 
 export function isJoinRow(i: FeedItem): i is JoinRow {
   return i.k === 'join';
+}
+
+/**
+ * 上のフィードに流す入室か(すべて・コメントタブ)。自分でニックネームを付けている人、またはメモ・前回・よみがな持ち。
+ * 既定名(user + 数字)のままでメモも無い人の入室だけ下の固定枠に出す。
+ */
+export function featuredJoin(v: Viewer, memo: MemoRecord | undefined): boolean {
+  return hasOwnNickname(v) || hasMemoContent(memo);
 }
 
 export interface FilterOptions {
@@ -461,6 +480,7 @@ export function enterRoom(s: FeedState, roomId: string, o: { hostNickname?: stri
     seenOrder: [],
     streaks: new Map(),
     lastJoin: new Map(),
+    joinNth: new Map(),
     diamonds: 0,
     giftCount: 0,
     commentCount: 0,
@@ -547,6 +567,11 @@ export function restoreFeed(items: ScreenItem[], meta: ScreenMeta | null): { sta
   // 途中の tick(行の id ではない)が再送されても、新しい行を作らず 💎 も増やさない。
   for (const r of rows) {
     if (r.k === 'gift' && r.groupId) s.streaks.set(`g:${r.groupId}`, { rowId: r.id, counted: r.count });
+  }
+  // この配信(最後の区切り以降)の入室回数は、行に載せた nth から組み直す。
+  for (const it of sorted) {
+    if (it.k === 'room') s.joinNth.clear();
+    else if (it.k === 'join' && it.roomId === lastRoomId) s.joinNth.set(it.viewer.userId, Math.max(s.joinNth.get(it.viewer.userId) ?? 0, it.nth ?? 1));
   }
   if (meta) {
     s.roomId = meta.roomId;

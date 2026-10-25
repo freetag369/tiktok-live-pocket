@@ -6,6 +6,11 @@ export function VisitBadge({ visits, firstEver }: { visits: number; firstEver: b
   return <span className={`badge visits${regular ? ' regular' : ''}`}>{visits}回目</span>;
 }
 
+/** 入室の緑タグ。その配信で 2 回目以降の入室は「再入室 N回目」(来店の「N回目」とは別)。 */
+export function JoinTag({ nth }: { nth?: number }) {
+  return nth != null && nth >= 2 ? <span className="badge join again">再入室 {nth}回目</span> : <span className="badge join">入室</span>;
+}
+
 /** ギフターレベル(入室通知に載っているときだけ)。 */
 export function GradeBadge({ v }: { v: Viewer }) {
   return v.gifterLevel ? <span className="badge grade">Lv.{v.gifterLevel}</span> : null;

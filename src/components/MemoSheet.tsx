@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { lastJoined } from '../lib/format';
 import { hasMemoContent, KANA_MAX_LEN, MEMO_MAX_LEN, type MemoPatch, type MemoRecord } from '../lib/memos';
 import { displayName } from '../lib/names';
 import { Avatar } from './Avatar';
@@ -26,6 +27,9 @@ interface Props {
   history?: React.ReactNode;
   /** 開いたらメモ欄にカーソルを置く(既定 true)。履歴を見に来たときはキーボードで隠さない。 */
   autoFocus?: boolean;
+  /** 「前回入室：」を名前の下に出す(フィードでは入室の行にしか出さないので、タップしたらここで分かるようにする)。 */
+  showPreviousJoined?: boolean;
+  previousJoinedMs?: number;
 }
 
 /**
@@ -33,7 +37,7 @@ interface Props {
  * 保存したメモは次回以降の配信でも残り、その人の行(入室・コメント・ギフト)に表示される。
  * 上の ★ でお気に入りにすると、その人の行の背景が青になる(★ は押した時点で保存。メモの削除では外れない)。
  */
-export function MemoSheet({ target, current, showAvatars, onSave, onFavorite, onClose, history, autoFocus = true }: Props) {
+export function MemoSheet({ target, current, showAvatars, onSave, onFavorite, onClose, history, autoFocus = true, showPreviousJoined, previousJoinedMs }: Props) {
   const [note, setNote] = useState(current?.note ?? '');
   const [previousNote, setPreviousNote] = useState(current?.previousNote ?? '');
   const [kana, setKana] = useState(current?.kana ?? '');
@@ -71,9 +75,10 @@ export function MemoSheet({ target, current, showAvatars, onSave, onFavorite, on
               <span className="who">{name}</span>
               {handle && handle !== name ? <span className="handle">@{handle}</span> : null}
             </div>
-            {target.visits != null ? (
+            {target.visits != null || showPreviousJoined ? (
               <div className="msheet-sub">
-                <VisitBadge visits={target.visits} firstEver={Boolean(target.firstEver)} />
+                {target.visits != null ? <VisitBadge visits={target.visits} firstEver={Boolean(target.firstEver)} /> : null}
+                {showPreviousJoined ? <span className="last-joined">前回入室：{lastJoined(previousJoinedMs)}</span> : null}
               </div>
             ) : null}
           </div>

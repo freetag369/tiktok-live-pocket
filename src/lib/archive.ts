@@ -115,8 +115,10 @@ export function sanitizeArchivedRow(raw: unknown): ArchivedRow | null {
     }
     case 'comment':
       return { k: 'comment', ...common, text: typeof r.text === 'string' ? r.text : '' };
-    case 'join':
-      return { k: 'join', ...common };
+    case 'join': {
+      const nth = Math.floor(Number(r.nth));
+      return nth >= 2 ? { k: 'join', ...common, nth } : { k: 'join', ...common };
+    }
     case 'social':
       return { k: 'social', ...common, sub: r.sub === 'share' ? 'share' : r.sub === 'other' ? 'other' : 'follow' };
     case 'gift': {

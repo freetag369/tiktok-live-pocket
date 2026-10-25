@@ -30,12 +30,18 @@ it('フィードでは「前回」をその配信でその人の最初の行に�
 
     let html = feed('all');
     expect(count(html, '前回：ギフトのお礼')).toBe(1);
-    // 📝 本文と前回入室は今まで通り全行に出る。
+    // 📝 本文は今まで通り全行に出る。前回入室は(入室が届いていないので)その人の最初の行にだけ = 人ごとに 1 回。
     expect(count(html, '📝 常連さん')).toBe(3);
-    expect(count(html, '前回入室：')).toBe(4);
+    expect(count(html, '前回入室：')).toBe(2);
     // 最初の行(c1)に付き、2 行目(c2)には付かない。
     expect(html.indexOf('前回：ギフトのお礼')).toBeLessThan(html.indexOf('また来ました'));
-    expect(count(feed('comment'), '前回：ギフトのお礼')).toBe(1);
+    expect(html.indexOf('前回入室：')).toBeLessThan(html.indexOf('また来ました'));
+    // コメントタブではメモも前回入室も出さない。
+    const commentTab = feed('comment');
+    expect(count(commentTab, '前回：ギフトのお礼')).toBe(0);
+    expect(count(commentTab, '📝 常連さん')).toBe(0);
+    expect(count(commentTab, '前回入室：')).toBe(0);
+    expect(commentTab).toContain('また来ました');
     expect(count(feed('gift'), '前回：ギフトのお礼')).toBe(1);
 
     // 配信が変わると、その配信の最初の行にまた 1 回出る。

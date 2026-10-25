@@ -5,7 +5,7 @@ import { hhmm, num, lastJoined } from '../lib/format';
 import { japaneseGiftName } from '../lib/gift-names';
 import { displayName } from '../lib/names';
 import { Avatar, GiftIcon } from './Avatar';
-import { GradeBadge, RoleBadges, VisitBadge } from './Badges';
+import { GradeBadge, JoinTag, RoleBadges, VisitBadge } from './Badges';
 
 export interface RowProps {
   row: Row;
@@ -15,9 +15,11 @@ export interface RowProps {
   note?: string;
   /** 「前回」メモ。フィードでは配信ごとにその人の最初の行にだけ渡される(FeedList 側で絞る)。 */
   previousNote?: string;
+  /** コメントタブではメモも前回入室も出さない(FeedList 側で渡さない)。 */
   kana?: string;
   /** お気に入りの人。行の背景を青にする。 */
   favorite?: boolean;
+  /** 「前回入室：」の行。フィードでは入室の行と、配信ごとにその人の最初の行にだけ渡される(FeedList 側で絞る)。 */
   showPreviousJoined?: boolean;
   previousJoinedMs?: number;
   /** 行をタップしたとき(メモを書く)。 */
@@ -63,7 +65,7 @@ export const FeedRowView = memo(function FeedRowView({ row, showAvatars, bigGift
               <GradeBadge v={v} />
               <span className="who">{name}</span>
               {kanaEl}
-              <span>が入室</span>
+              <JoinTag nth={row.nth} />
               <VisitBadge visits={row.visits} firstEver={row.firstEver} />
               <span className="time">{hhmm(row.tsMs)}</span>
             </div>

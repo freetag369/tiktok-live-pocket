@@ -8,8 +8,7 @@ import { Highlights } from './components/Highlights';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
-import { countDataRows, dockJoins, JOIN_DOCK_KEEP, type FeedRow, type JoinRow } from './lib/feed';
-import { hasMemoContent } from './lib/memos';
+import { countDataRows, dockJoins, featuredJoin, JOIN_DOCK_KEEP, type FeedRow, type JoinRow } from './lib/feed';
 import { JoinDock } from './components/JoinDock';
 import { FollowToast } from './components/FollowToast';
 import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
@@ -111,10 +110,11 @@ export function App() {
 
   const f = snap.feed;
   const hasRows = f.rows.some((r) => r.k !== 'room');
-  // 下の固定枠(入室)。「すべて」「コメント」タブに出す。メモ・前回・よみがなの無い人の入室は枠へ、ある人の入室は上のフィードへ(FeedList の keepJoin)。
+  // 下の固定枠(入室)。「すべて」「コメント」タブに出す。既定名(user + 数字)のままでメモも無い人の入室は枠へ、
+  // ニックネーム持ち・メモ持ちの入室は上のフィードへ(FeedList の keepJoin と同じ判定)。
   const dockTab = tab === 'all' || tab === 'comment' ? tab : null;
   const docked = dockTab !== null;
-  const memoJoin = useCallback((r: JoinRow) => hasMemoContent(snap.memos.get(r.viewer.userId)), [snap.memos]);
+  const memoJoin = useCallback((r: JoinRow) => featuredJoin(r.viewer, snap.memos.get(r.viewer.userId)), [snap.memos]);
   const dockRows = useMemo(() => (dockTab ? dockJoins(f.rows, dockTab, JOIN_DOCK_KEEP, memoJoin) : []), [dockTab, f.rows, memoJoin]);
   const isFavorite = useCallback((userId: string) => Boolean(snap.memos.get(userId)?.favorite), [snap.memos]);
   const tabs: Array<[AppTab, string, number | null]> = [
@@ -301,6 +301,8 @@ export function App() {
           target={memoTarget}
           current={snap.memos.get(memoTarget.userId)}
           showAvatars={settings.showAvatars}
+          showPreviousJoined
+          previousJoinedMs={session.previousJoinedFor(memoTarget.userId)}
           onSave={(patch) => session.setMemo(memoTarget.userId, patch)}
           onFavorite={(favorite) => session.setMemo(memoTarget.userId, { favorite, nickname: memoTarget.nickname, uniqueId: memoTarget.uniqueId })}
           onClose={() => setMemoTarget(null)}

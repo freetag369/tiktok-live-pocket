@@ -628,6 +628,11 @@ img {
   background: rgba(255, 197, 66, 0.2);
   color: var(--gold);
 }
+/* 入室の緑タグ(すべて・入室タブの行。「再入室 N回目」も同じ色) */
+.badge.join {
+  background: rgba(74, 217, 145, 0.2);
+  color: var(--green);
+}
 
 /* ── 設定画面 ──────────────────────────────────────────── */
 .sheet {
@@ -872,6 +877,13 @@ img {
 }
 .msheet-sub {
   margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.msheet-sub .last-joined {
+  margin-top: 0;
 }
 /* お気に入りの切り替え。付いている間は青。 */
 .favbtn {
