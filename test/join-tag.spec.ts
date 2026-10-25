@@ -17,7 +17,7 @@ function rowsOf(html: string): string[] {
 }
 
 describe('入室の緑タグと前回入室の出る行', () => {
-  it('すべて: ニックネーム持ちの入室は緑タグ、同じ配信の出直しは「再入室 2回目」、前回入室は入室行と最初の行だけ。コメント: どれも出ない', async () => {
+  it('すべて: メモ持ちの入室は緑タグ、同じ配信の出直しは「再入室 2回目」、前回入室は入室行と最初の行だけ。コメント: どれも出ない', async () => {
     const session = new LiveSession(() => ({ ...DEFAULT_SETTINGS }));
     await session.whenReady();
     try {

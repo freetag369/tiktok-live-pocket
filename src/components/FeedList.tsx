@@ -23,7 +23,7 @@ interface Props {
   memos: ReadonlyMap<string, MemoRecord>;
   onTapRow?: (row: FeedRow) => void;
   previousJoinedFor?: (userId: string) => number | undefined;
-  /** 下の固定枠(JoinDock)が入室を出しているタブ。既定名(user + 数字)のままでメモも無い人の入室は上に流さず枠に出し、それ以外の入室は上に流す。 */
+  /** 下の固定枠(JoinDock)が入室を出しているタブ。メモ・前回・よみがなの無い入室は上に流さず枠に出し、ある人の入室だけ上に流す。 */
   docked?: boolean;
 }
 
@@ -93,7 +93,7 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
   const anchor = useRef<{ id: string; top: number } | null>(null);
   const [, bump] = useState(0);
 
-  // 枠のあるタブでは、既定名のままでメモも無い人の入室は上に並べず下の固定枠(JoinDock)に出す。ニックネーム持ち・メモ持ちの入室は上に流す。
+  // 枠のあるタブでは、メモ・前回・よみがなの無い入室は上に並べず下の固定枠(JoinDock)に出す。ある人の入室は上に緑タグで流す。
   const items = useMemo(
     () => filterRows(rows, tab, docked ? { dropJoins: true, keepJoin: (r) => featuredJoin(r.viewer, memos.get(r.viewer.userId)) } : undefined),
     [rows, tab, docked, memos],

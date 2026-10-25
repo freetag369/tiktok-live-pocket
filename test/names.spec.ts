@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { displayName, handleOf, hasOwnNickname, hasVisibleChar, initialOf } from '../src/lib/names';
+import { displayName, handleOf, hasVisibleChar, initialOf } from '../src/lib/names';
 import { dockLabel } from '../src/components/JoinDock';
 import { FeedRowView } from '../src/components/FeedRow';
 import { Avatar } from '../src/components/Avatar';
@@ -14,24 +14,6 @@ const REAL_INVISIBLE = {
   '490nyan': '\u0F80\u0F72', // 土台の無いチベット結合母音
   'my0dd': '\u0651', // 土台の無いアラビア結合記号
 };
-
-describe('自分でニックネームを付けている人(hasOwnNickname)', () => {
-  it('普通の名前・短い user 名・絵文字は付けている', () => {
-    expect(hasOwnNickname({ nickname: 'たろう' })).toBe(true);
-    expect(hasOwnNickname({ nickname: 'user12' })).toBe(true);
-    expect(hasOwnNickname({ nickname: 'userたろう123456' })).toBe(true);
-    expect(hasOwnNickname({ nickname: '🎁' })).toBe(true);
-  });
-
-  it('既定名(user + 6 桁以上の数字。大文字も)・空・描けない名前は付けていない', () => {
-    expect(hasOwnNickname({ nickname: 'user28420669859' })).toBe(false);
-    expect(hasOwnNickname({ nickname: 'User123456' })).toBe(false);
-    expect(hasOwnNickname({ nickname: ' user123456 ' })).toBe(false);
-    expect(hasOwnNickname({ nickname: '' })).toBe(false);
-    expect(hasOwnNickname({})).toBe(false);
-    for (const nick of Object.values(REAL_INVISIBLE)) expect(hasOwnNickname({ nickname: nick })).toBe(false);
-  });
-});
 
 describe('描ける文字の判定', () => {
   it('普通の名前・既定名・絵文字 1 文字は描ける', () => {

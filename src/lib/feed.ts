@@ -1,7 +1,6 @@
 import type { GiftEvent, NormalizedEvent, Viewer } from './events';
 import { touchLike, type LikeEntry } from './likes';
 import { hasMemoContent, type MemoRecord } from './memos';
-import { hasOwnNickname } from './names';
 
 /** 画面に並ぶ 1 行。UI はこれだけを描く。 */
 export type FeedRow =
@@ -367,11 +366,11 @@ export function isJoinRow(i: FeedItem): i is JoinRow {
 }
 
 /**
- * 上のフィードに流す入室か(すべて・コメントタブ)。自分でニックネームを付けている人、またはメモ・前回・よみがな持ち。
- * 既定名(user + 数字)のままでメモも無い人の入室だけ下の固定枠に出す。
+ * 上のフィードに流す入室か(すべて・コメントタブ)。メモ・前回・よみがなのどれかを書いてある人。
+ * 書いていない人の入室は(名前付きで)下の固定枠に出す。
  */
-export function featuredJoin(v: Viewer, memo: MemoRecord | undefined): boolean {
-  return hasOwnNickname(v) || hasMemoContent(memo);
+export function featuredJoin(_v: Viewer, memo: MemoRecord | undefined): boolean {
+  return hasMemoContent(memo);
 }
 
 export interface FilterOptions {

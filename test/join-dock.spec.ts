@@ -9,7 +9,7 @@ import { LiveSession } from '../src/lib/session';
 import { DEFAULT_SETTINGS } from '../src/lib/settings';
 
 describe('下の固定枠(入室)', () => {
-  it('既定名(user + 数字)の入室だけ名前・回数(初見)・前回入室で枠に出し、ニックネーム持ちの入室はすべて・コメントタブの上に緑タグで流す', async () => {
+  it('メモの無い入室は名前の有無に関わらず名前・回数(初見)・前回入室で枠に出し、すべて・コメントタブの上のフィードには流さない', async () => {
     const session = new LiveSession(() => ({ ...DEFAULT_SETTINGS }));
     await session.whenReady();
     try {
@@ -30,23 +30,22 @@ describe('下の固定枠(入室)', () => {
       for (const tab of ['all', 'comment'] as const) {
         const rows = dockJoins(snap.feed.rows, tab, JOIN_DOCK_KEEP, featured);
         // 前の配信の入室も行として残っている(フィードと同じ)
-        expect(rows.map((r) => r.id)).toEqual(['p2', 'j2', 'j3']);
+        expect(rows.map((r) => r.id)).toEqual(['p1', 'p2', 'j1', 'j2', 'j3']);
         const dock = renderToStaticMarkup(createElement(JoinDock, { rows, showAvatars: false, previousJoinedFor: session.previousJoinedFor }));
+        expect(dock).toContain('たろう');
         expect(dock).toContain('user28420669859');
         expect(dock).toContain('2回目');
         expect(dock).toContain('前回入室：9月28日19時');
         expect(dock).toContain('user31000000001');
         expect(dock).toContain('初見');
         expect(dock).toContain('前回入室：未記録');
-        expect(dock).not.toContain('たろう');
         expect(dock).not.toContain('が入室');
         expect(dock).not.toContain('badge join');
 
         const feed = renderToStaticMarkup(createElement(FeedList, { rows: snap.feed.rows, tab, showAvatars: false, bigGiftDiamonds: 100, memos: snap.memos, empty: '', docked: true }));
         expect(feed).toContain('はなこ');
-        expect(feed).toContain('たろう');
-        expect(feed).toContain('class="badge join">入室<');
-        expect(feed).not.toContain('が入室');
+        expect(feed).not.toContain('たろう');
+        expect(feed).not.toContain('badge join');
         expect(feed).not.toContain('user28420669859');
         expect(feed).not.toContain('user31000000001');
       }
@@ -60,7 +59,7 @@ describe('下の固定枠(入室)', () => {
     }
   });
 
-  it('既定名でもメモ・前回・よみがなのどれかがある人の入室は枠に入れず、すべて・コメントタブの上のフィードに(すべてではよみがな・メモ付きで)流す', async () => {
+  it('メモ・前回・よみがなのどれかがある人の入室は枠に入れず、すべて・コメントタブの上のフィードに緑タグで(すべてではよみがな・メモ付きで)流す', async () => {
     const session = new LiveSession(() => ({ ...DEFAULT_SETTINGS }));
     await session.whenReady();
     try {
