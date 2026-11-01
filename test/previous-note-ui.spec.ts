@@ -31,7 +31,7 @@ it('前回だけの保存・復元と各ユーザー一覧の表示、デモ分�
       renderToStaticMarkup(createElement(FeedList, { ...common, tab: 'all' })),
       renderToStaticMarkup(createElement(LikeRanking, { ...common, ...likes })),
       renderToStaticMarkup(createElement(ViewersSheet, { items: session.viewersForList(), showAvatars: false, onPick: () => {}, onClose: () => {} })),
-      renderToStaticMarkup(createElement(Interactions, { ...common, ...likes, session, roomId: 'previous-note-room', screenEpoch: snap.screenEpoch, onMemo: () => {} })),
+      renderToStaticMarkup(createElement(Interactions, { ...common, ...likes, session, roomId: 'previous-note-room', screenEpoch: snap.screenEpoch, archiveGeneration: 0, onMemo: () => {} })),
     ]) expect(html).toContain('前回：ギフトのお礼');
     expect(filterInteractions(buildInteractions(snap.feed.rows.filter((r) => r.k !== 'room'), snap.feed.likes), 'お礼', snap.memos).map((r) => r.userId)).toContain(userId);
     await session.resetHistory();

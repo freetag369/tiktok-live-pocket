@@ -24,7 +24,7 @@ describe('各タブの前回入室表示', () => {
         const common = { rows: snap.feed.rows, memos: snap.memos, showAvatars: false, bigGiftDiamonds: 100, empty: '' };
         return [
           renderToStaticMarkup(createElement(FeedList, { ...common, tab: 'all', previousJoinedFor: session.previousJoinedFor })),
-          renderToStaticMarkup(createElement(Interactions, { ...common, session, roomId: 'room', likes: snap.feed.likes, likeCount: snap.feed.likeCount, screenEpoch: snap.screenEpoch, onMemo: () => {} })),
+          renderToStaticMarkup(createElement(Interactions, { ...common, session, roomId: 'room', likes: snap.feed.likes, likeCount: snap.feed.likeCount, screenEpoch: snap.screenEpoch, archiveGeneration: 0, onMemo: () => {} })),
         ];
       }
       for (const html of screens()) {

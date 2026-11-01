@@ -213,6 +213,7 @@ export function App() {
           likes={f.likes}
           likeCount={f.likeCount}
           screenEpoch={snap.screenEpoch}
+          archiveGeneration={snap.archiveGeneration}
           memos={snap.memos}
           showAvatars={settings.showAvatars}
           bigGiftDiamonds={settings.bigGiftDiamonds}

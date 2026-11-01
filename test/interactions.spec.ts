@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sheetItems, sortInteractions, type Interaction } from '../src/lib/interactions';
+import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, previousStream, sheetItems, sortInteractions, type Interaction } from '../src/lib/interactions';
+import type { StreamRecord } from '../src/lib/archive';
 import type { FeedItem, FeedRow, RoomMark } from '../src/lib/feed';
 import type { LikeEntry } from '../src/lib/likes';
 import type { MemoRecord } from '../src/lib/memos';
@@ -133,5 +134,35 @@ describe('sheetItems', () => {
     const rows = [comment('c1', 'a', T), gift('g1', 'a', T + 1, 2)];
     expect(sheetItems(base(rows, 9, T + 5))).toEqual(rows);
     expect(sheetItems(base([], 9, T + 5))).toEqual([]);
+  });
+});
+
+describe('いいね行と前回の配信', () => {
+  const likeRow = (id: string, userId: string, tsMs: number, count: number): FeedRow => ({ k: 'like', id, tsMs, viewer: { userId, nickname: `n${userId}` }, count, visits: 3, firstEver: false });
+
+  it('likes に無い人はアーカイブの 1 分ごとのいいね行で数える(前回の配信・再読み込み後)', () => {
+    const rows = [likeRow('l1', 'a', T, 4), likeRow('l2', 'a', T + 60_000, 6), comment('c1', 'b', T + 10)];
+    const out = buildInteractions(rows, new Map());
+    const a = out.find((i) => i.userId === 'a')!;
+    expect(a).toMatchObject({ likes: 10, likeLastMs: T + 60_000, lastMs: T + 60_000, comments: 0 });
+    expect(a.rows.map((r) => r.id)).toEqual(['l1', 'l2']);
+  });
+
+  it('likes にも居れば多い方・新しい方を採る(受信中は likes が先行する)', () => {
+    const rows = [likeRow('l1', 'a', T, 4)];
+    const [a] = buildInteractions(rows, new Map([like('a', 9, T + 500)]));
+    expect(a).toMatchObject({ likes: 9, likeLastMs: T + 500 });
+    const [b] = buildInteractions([likeRow('l1', 'a', T + 1000, 20)], new Map([like('a', 9, T + 500)]));
+    expect(b).toMatchObject({ likes: 20, likeLastMs: T + 1000 });
+  });
+
+  it('前回 = いまの配信以外で一番新しい配信。無ければ undefined', () => {
+    const s = (roomId: string, startedMs: number): StreamRecord => ({ roomId, startedMs, endedMs: startedMs + 1000, rows: 1, comments: 1, joins: 0, gifts: 0, diamonds: 0 });
+    const streams = [s('old', T - 2000), s('now', T), s('prev', T - 1000)];
+    expect(previousStream(streams, 'now')?.roomId).toBe('prev');
+    // まだ接続していない(roomId 空)なら一番新しい配信
+    expect(previousStream(streams, '')?.roomId).toBe('now');
+    expect(previousStream([s('now', T)], 'now')).toBeUndefined();
+    expect(previousStream([], 'now')).toBeUndefined();
   });
 });

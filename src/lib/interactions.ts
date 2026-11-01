@@ -1,3 +1,4 @@
+import type { StreamRecord } from './archive';
 import type { Viewer } from './events';
 import type { FeedItem, FeedRow } from './feed';
 import type { LikeEntry } from './likes';
@@ -11,6 +12,8 @@ import type { MemoRecord } from './memos';
  *    落ちた分の補い)を id で重複排除して使う。画面側が新しい(連打の ×N)ので画面側を優先。
  *  - いいねは行にならない(FeedState.likes の人ごと累計)ので、taps と lastMs だけを足す。
  *    アーカイブから来る 1 分ごとのいいね行(k: 'like')は rows に残るが、人物シートでは sheetItems が 1 本にまとめる。
+ *    likes に無い人(前回の配信・再読み込み後)はいいね行の合計を回数にする(両方あれば多い方)。
+ *  - 「前回」は 🗂 アーカイブの、いまの配信以外で一番新しい配信。接続して部屋が変わっても見返せる。
  */
 
 export interface Interaction {
@@ -69,6 +72,8 @@ function byTs(a: FeedRow, b: FeedRow): number {
 export function buildInteractions(rows: FeedRow[], likes: ReadonlyMap<string, LikeEntry>): Interaction[] {
   const map = new Map<string, Interaction>();
   const sorted = rows.slice().sort(byTs);
+  // 1 分ごとのいいね行の合計(人ごと)。likes に無い人の回数の代わり。
+  const rowLikes = new Map<string, { count: number; lastMs: number }>();
   for (const r of sorted) {
     const id = r.viewer.userId;
     let it = map.get(id);
@@ -96,7 +101,19 @@ export function buildInteractions(rows: FeedRow[], likes: ReadonlyMap<string, Li
       case 'social':
         if (r.sub === 'follow') it.follows++;
         break;
+      case 'like': {
+        const l = rowLikes.get(id) ?? { count: 0, lastMs: 0 };
+        l.count += r.count;
+        l.lastMs = Math.max(l.lastMs, r.tsMs);
+        rowLikes.set(id, l);
+        break;
+      }
     }
+  }
+  for (const [id, l] of rowLikes) {
+    const it = map.get(id)!;
+    it.likes = l.count;
+    it.likeLastMs = l.lastMs;
   }
   for (const e of likes.values()) {
     if (e.taps <= 0) continue;
@@ -105,8 +122,8 @@ export function buildInteractions(rows: FeedRow[], likes: ReadonlyMap<string, Li
       it = { userId: e.userId, viewer: e.viewer, comments: 0, gifts: 0, diamonds: 0, joins: 0, follows: 0, likes: 0, lastMs: e.lastMs, visits: e.visits, firstEver: e.firstEver, rows: [] };
       map.set(e.userId, it);
     }
-    it.likes = e.taps;
-    it.likeLastMs = e.lastMs;
+    it.likes = Math.max(it.likes, e.taps);
+    it.likeLastMs = Math.max(it.likeLastMs ?? 0, e.lastMs);
     if (e.lastMs >= it.lastMs) {
       it.lastMs = e.lastMs;
       it.viewer = e.viewer;
@@ -156,6 +173,16 @@ export function sheetItems(it: Interaction): SheetItem[] {
   let at = out.length;
   while (at > 0 && out[at - 1]!.tsMs > sum.lastMs) at--;
   return [...out.slice(0, at), sum, ...out.slice(at)];
+}
+
+/** 「前回」の配信: いまの配信(currentRoomId)以外で一番新しいもの。無ければ undefined。 */
+export function previousStream(streams: readonly StreamRecord[], currentRoomId: string): StreamRecord | undefined {
+  let best: StreamRecord | undefined;
+  for (const s of streams) {
+    if (s.roomId === currentRoomId) continue;
+    if (!best || s.startedMs > best.startedMs) best = s;
+  }
+  return best;
 }
 
 function byUserId(a: Interaction, b: Interaction): number {
