@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MemoLines } from './MemoLines';
 import type { FeedItem, FeedRow } from '../lib/feed';
-import { hhmm, num, lastJoined } from '../lib/format';
-import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, sheetItems, sortInteractions, type Interaction, type InteractionSort, type LikeSummary } from '../lib/interactions';
+import { streamHost, type StreamRecord } from '../lib/archive';
+import { dateRange, hhmm, num, lastJoined } from '../lib/format';
+import { buildInteractions, currentRoomRows, filterInteractions, mergeRows, previousStream, sheetItems, sortInteractions, type Interaction, type InteractionSort, type LikeSummary } from '../lib/interactions';
 import type { LikeEntry } from '../lib/likes';
 import { hasMemoContent, type MemoRecord } from '../lib/memos';
 import { displayName, handleOf } from '../lib/names';
@@ -19,6 +20,9 @@ import type { MemoTarget } from './MemoSheet';
  *
  *  - 行は 画面の履歴(最後の区切り以降)+ アーカイブ(🧹 で消えた分の補い)。いいねは FeedState.likes。
  *  - アーカイブはタブを開いたとき・🧹 のとき(screenEpoch)・配信が変わったときに読み直す。
+ *  - 「今回 / 前回」の切り替え。接続して部屋が変わると今回の一覧は空になるので、前回(🗂 アーカイブの
+ *    いまの配信以外で一番新しい配信)を同じ一覧で見返せる。前回のいいねはアーカイブの 1 分行から数える。
+ *    前回では「前回入室：」を出さない(その配信そのものを指してしまう)。
  *  - 人物シートは一覧の上に重ねて出す(一覧はアンマウントしない)。戻ったとき一覧のスクロール位置が
  *    そのまま残り、見ていた人の行だけ scrollIntoView で見える位置に寄せる。
  *  - シート上で左スワイプ(指が右→左)すると一覧順で次の人、右スワイプで前の人へ即切り替え。
@@ -33,6 +37,8 @@ interface Props {
   likes: Map<string, LikeEntry>;
   likeCount: number;
   screenEpoch: number;
+  /** アーカイブを受信以外で書き換えた回数(SessionSnapshot.archiveGeneration)。変わったら前回を読み直す。 */
+  archiveGeneration: number;
   memos: ReadonlyMap<string, MemoRecord>;
   showAvatars: boolean;
   bigGiftDiamonds: number;
@@ -45,8 +51,17 @@ function targetOf(it: Interaction): MemoTarget {
   return { userId: it.userId, nickname: v.nickname, uniqueId: v.uniqueId, avatarUrl: v.avatarUrl, visits: it.visits, firstEver: it.firstEver };
 }
 
-export function Interactions({ session, roomId, rows, likes, likeCount, screenEpoch, memos, showAvatars, bigGiftDiamonds, onMemo, empty }: Props) {
+type View = 'now' | 'prev';
+
+/** 前回の配信の読み込み結果。undefined = まだ / null = 前回の配信が無い。 */
+type Prev = { forRoomId: string; stream: StreamRecord; rows: FeedRow[] } | null | undefined;
+
+const NO_LIKES: ReadonlyMap<string, LikeEntry> = new Map();
+
+export function Interactions({ session, roomId, rows, likes, likeCount, screenEpoch, archiveGeneration, memos, showAvatars, bigGiftDiamonds, onMemo, empty }: Props) {
   const [archived, setArchived] = useState<{ roomId: string; rows: FeedRow[] } | null>(null);
+  const [view, setView] = useState<View>('now');
+  const [prev, setPrev] = useState<Prev>(undefined);
   const [sort, setSort] = useState<InteractionSort>('recent');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<string | null>(null);
@@ -63,10 +78,31 @@ export function Interactions({ session, roomId, rows, likes, likeCount, screenEp
     };
   }, [session, roomId, screenEpoch]);
 
+  // 前回は「前回」を開いたときだけ読む。配信が変わったとき・アーカイブが書き換わったときは読み直す。
+  useEffect(() => {
+    if (view !== 'prev') return;
+    let alive = true;
+    setPrev((p) => (p && p.forRoomId === roomId ? p : undefined));
+    void (async () => {
+      const s = previousStream(await session.listArchive(), roomId);
+      if (!s) {
+        if (alive) setPrev(null);
+        return;
+      }
+      const r = await session.loadArchivedStream(s.roomId);
+      if (alive) setPrev({ forRoomId: roomId, stream: s, rows: r });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [session, roomId, view, archiveGeneration]);
+
   const merged = useMemo(() => mergeRows(archived && archived.roomId === roomId ? archived.rows : [], currentRoomRows(rows)), [archived, roomId, rows]);
+  const showingPrev = view === 'prev';
+  const prevRows = showingPrev && prev ? prev.rows : undefined;
   // likes の Map はその場で更新されるので likeCount を変化の印にする。
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const all = useMemo(() => buildInteractions(merged, likes), [merged, likes, likeCount]);
+  const all = useMemo(() => (prevRows ? buildInteractions(prevRows, NO_LIKES) : showingPrev ? [] : buildInteractions(merged, likes)), [prevRows, showingPrev, merged, likes, likeCount]);
   const list = useMemo(() => filterInteractions(sortInteractions(all, sort), query, memos), [all, sort, query, memos]);
 
   const person = open ? all.find((i) => i.userId === open) : undefined;
@@ -87,12 +123,39 @@ export function Interactions({ session, roomId, rows, likes, likeCount, screenEp
     setOpen(null);
   };
 
+  const prevLabel = !showingPrev ? null : prev === undefined ? '読み込み中…' : prev === null ? '前回の配信はまだありません' : `${dateRange(prev.stream.startedMs, prev.stream.endedMs)} ${streamHost(prev.stream)}`.trim();
+  const emptyNode = !showingPrev ? (
+    empty
+  ) : prev === undefined ? (
+    '読み込み中…'
+  ) : prev === null ? (
+    <>
+      前回の配信はまだありません。
+      <br />
+      🗂 アーカイブに残った配信が「前回」になります。
+    </>
+  ) : (
+    <>前回の配信にはやり取りがありません。</>
+  );
+
   return (
     <>
       {person ? <PersonSheet key={person.userId} it={person} memo={memos.get(person.userId)} showAvatars={showAvatars} bigGiftDiamonds={bigGiftDiamonds} onMemo={onMemo} onBack={close} onNext={() => step(1)} onPrev={() => step(-1)} /> : null}
       <div className="people">
+        {/* 今回 / 前回。接続で今回が空になっても、ここから前回の配信を見返せる */}
+        <div className="people-tools people-view">
+          <div className="seg" role="tablist" aria-label="配信">
+            <button className={!showingPrev ? 'on' : ''} onClick={() => setView('now')}>
+              今回
+            </button>
+            <button className={showingPrev ? 'on' : ''} onClick={() => setView('prev')}>
+              前回
+            </button>
+          </div>
+          <span className="people-stream">{prevLabel ?? '受信中の配信'}</span>
+        </div>
         {all.length === 0 ? (
-          <div className="empty">{empty}</div>
+          <div className="empty">{emptyNode}</div>
         ) : (
           <>
             <div className="people-tools">
@@ -112,7 +175,7 @@ export function Interactions({ session, roomId, rows, likes, likeCount, screenEp
             <div className="people-list" ref={listRef}>
               {list.length === 0 ? <div className="empty">該当する人がいません。</div> : null}
               {list.map((it) => (
-                <PersonRow key={it.userId} previousJoinedMs={session.previousJoinedFor(it.userId)} it={it} memo={memos.get(it.userId)} showAvatars={showAvatars} onPick={() => setOpen(it.userId)} />
+                <PersonRow key={it.userId} previousJoinedMs={showingPrev ? undefined : session.previousJoinedFor(it.userId)} showPreviousJoined={!showingPrev} it={it} memo={memos.get(it.userId)} showAvatars={showAvatars} onPick={() => setOpen(it.userId)} />
               ))}
             </div>
           </>
@@ -150,7 +213,7 @@ function Counts({ it, likeTime }: { it: Interaction; likeTime?: boolean }) {
   );
 }
 
-function PersonRow({ it, memo, showAvatars, onPick, previousJoinedMs }: { previousJoinedMs?: number; it: Interaction; memo?: MemoRecord; showAvatars: boolean; onPick: () => void }) {
+function PersonRow({ it, memo, showAvatars, onPick, previousJoinedMs, showPreviousJoined = true }: { previousJoinedMs?: number; showPreviousJoined?: boolean; it: Interaction; memo?: MemoRecord; showAvatars: boolean; onPick: () => void }) {
   const { name, handle } = nameOf(it, memo);
   return (
     <button className={`vrow prow${hasMemoContent(memo) ? ' has-memo' : ''}${memo?.favorite ? ' fav' : ''}`} data-uid={it.userId} onClick={onPick}>
@@ -163,7 +226,7 @@ function PersonRow({ it, memo, showAvatars, onPick, previousJoinedMs }: { previo
           <VisitBadge visits={it.visits} firstEver={it.firstEver} />
           <span className="time">{hhmm(it.lastMs)}</span>
         </div>
-        <div className="last-joined">前回入室：{lastJoined(previousJoinedMs)}</div>
+        {showPreviousJoined ? <div className="last-joined">前回入室：{lastJoined(previousJoinedMs)}</div> : null}
         <Counts it={it} />
         <MemoLines note={memo?.note} previousNote={memo?.previousNote} />
       </div>

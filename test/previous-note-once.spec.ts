@@ -53,7 +53,7 @@ it('フィードでは「前回」をその配信でその人の最初の行に�
 
     // やり取り(人ごとに 1 行)は対象外で、従来どおり出る。
     const snap = session.snapshot();
-    const people = renderToStaticMarkup(createElement(Interactions, { session, roomId: 'once-room-2', rows: snap.feed.rows, likes: snap.feed.likes, likeCount: snap.feed.likeCount, screenEpoch: snap.screenEpoch, memos: snap.memos, showAvatars: false, bigGiftDiamonds: 100, onMemo: () => {}, empty: '' }));
+    const people = renderToStaticMarkup(createElement(Interactions, { session, roomId: 'once-room-2', rows: snap.feed.rows, likes: snap.feed.likes, likeCount: snap.feed.likeCount, screenEpoch: snap.screenEpoch, archiveGeneration: 0, memos: snap.memos, showAvatars: false, bigGiftDiamonds: 100, onMemo: () => {}, empty: '' }));
     expect(people).toContain('前回：ギフトのお礼');
   } finally {
     session.disconnect();

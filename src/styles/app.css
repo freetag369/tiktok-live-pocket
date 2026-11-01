@@ -1269,6 +1269,19 @@ img {
   background: var(--accent);
   color: #062a27;
 }
+.people-view {
+  padding-top: 8px;
+}
+.people-stream {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-dim);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
 .people-count {
   flex: none;
   margin: 6px 12px 0;
