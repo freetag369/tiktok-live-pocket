@@ -924,6 +924,32 @@ img {
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
+/* 定型文ボタン(メモ・前回の欄の上)。.favbtn と同じ小さいピル */
+.msheet-tpl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+.tplbtn {
+  flex: none;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: var(--bg-2);
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tplbtn:active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .msheet textarea,
 .msheet input[type='text'] {
   display: block;

@@ -20,9 +20,17 @@ export interface Settings {
   archiveEnabled: boolean;
   /** 残す配信の数。古い配信から自動で消える。 */
   archiveKeepStreams: number;
+  /** メモ編集の「メモ」欄の上に出す定型文ボタン(TEMPLATE_SLOTS 枠。空の枠はボタンを出さない)。 */
+  memoTemplates: string[];
+  /** 同じく「前回」欄の上の定型文ボタン。 */
+  previousTemplates: string[];
 }
 
 export const DEFAULT_WS_URL = 'wss://ws.eulerstream.com';
+
+/** 定型文ボタンの枠数と、1 つの定型文の最大文字数。 */
+export const TEMPLATE_SLOTS = 4;
+export const TEMPLATE_MAX_LEN = 50;
 
 export const DEFAULT_SETTINGS: Settings = {
   hostUniqueId: '',
@@ -36,6 +44,8 @@ export const DEFAULT_SETTINGS: Settings = {
   wsUrl: DEFAULT_WS_URL,
   archiveEnabled: true,
   archiveKeepStreams: 30,
+  memoTemplates: ['初見', '常連', '誕生日', 'ギフト'],
+  previousTemplates: ['ギフトのお礼', '前回の話の続き', 'フォローのお礼', 'バトル参加のお礼'],
 };
 
 export const ARCHIVE_KEEP_MIN = 1;
@@ -74,7 +84,20 @@ export function sanitize(s: Settings): Settings {
     wsUrl: /^wss?:\/\//.test((s.wsUrl ?? '').trim()) ? s.wsUrl.trim() : DEFAULT_WS_URL,
     archiveEnabled: s.archiveEnabled !== false,
     archiveKeepStreams: clampKeep(s.archiveKeepStreams),
+    memoTemplates: templates(s.memoTemplates, DEFAULT_SETTINGS.memoTemplates),
+    previousTemplates: templates(s.previousTemplates, DEFAULT_SETTINGS.previousTemplates),
   };
+}
+
+/** 定型文の枠を TEMPLATE_SLOTS 個に揃える。配列でなければ既定。各枠は trim して TEMPLATE_MAX_LEN に切り詰め、空の枠は '' のまま残す。 */
+function templates(v: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(v)) return [...fallback];
+  const out: string[] = [];
+  for (let i = 0; i < TEMPLATE_SLOTS; i++) {
+    const t = v[i];
+    out.push(typeof t === 'string' ? t.trim().slice(0, TEMPLATE_MAX_LEN) : '');
+  }
+  return out;
 }
 
 function clampKeep(v: unknown): number {

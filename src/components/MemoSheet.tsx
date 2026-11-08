@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { lastJoined } from '../lib/format';
-import { hasMemoContent, KANA_MAX_LEN, MEMO_MAX_LEN, type MemoPatch, type MemoRecord } from '../lib/memos';
+import { hasMemoContent, KANA_MAX_LEN, MEMO_MAX_LEN, prependTemplate, type MemoPatch, type MemoRecord } from '../lib/memos';
 import { displayName } from '../lib/names';
 import { Avatar } from './Avatar';
 import { VisitBadge } from './Badges';
@@ -30,6 +30,26 @@ interface Props {
   /** 「前回入室：」を名前の下に出す(フィードでは入室の行にしか出さないので、タップしたらここで分かるようにする)。 */
   showPreviousJoined?: boolean;
   previousJoinedMs?: number;
+  /** 「メモ」欄・「前回」欄の上に出す定型文ボタン(設定で変える)。空の枠は出さない。 */
+  memoTemplates?: string[];
+  previousTemplates?: string[];
+}
+
+const NO_TEMPLATES: string[] = [];
+
+/** 定型文ボタンの列。押すと onPick に文言を渡す。全部空なら何も出さない。 */
+function TemplateRow({ items, onPick }: { items: string[]; onPick: (t: string) => void }) {
+  const shown = items.filter((t) => t.trim());
+  if (shown.length === 0) return null;
+  return (
+    <div className="msheet-tpl">
+      {shown.map((t, i) => (
+        <button key={`${i}:${t}`} type="button" className="tplbtn" onClick={() => onPick(t)}>
+          {t}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -37,11 +57,21 @@ interface Props {
  * 保存したメモは次回以降の配信でも残り、その人の行(入室・コメント・ギフト)に表示される。
  * 上の ★ でお気に入りにすると、その人の行の背景が青になる(★ は押した時点で保存。メモの削除では外れない)。
  */
-export function MemoSheet({ target, current, showAvatars, onSave, onFavorite, onClose, history, autoFocus = true, showPreviousJoined, previousJoinedMs }: Props) {
+export function MemoSheet({ target, current, showAvatars, onSave, onFavorite, onClose, history, autoFocus = true, showPreviousJoined, previousJoinedMs, memoTemplates = NO_TEMPLATES, previousTemplates = NO_TEMPLATES }: Props) {
   const [note, setNote] = useState(current?.note ?? '');
   const [previousNote, setPreviousNote] = useState(current?.previousNote ?? '');
   const [kana, setKana] = useState(current?.kana ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
+  const prevRef = useRef<HTMLTextAreaElement>(null);
+  /** 定型文ボタン: 本文の一番最初に入れて、その欄にカーソルを戻す。 */
+  const pickNote = (t: string) => {
+    setNote((v) => prependTemplate(v, t));
+    ref.current?.focus();
+  };
+  const pickPrevious = (t: string) => {
+    setPreviousNote((v) => prependTemplate(v, t));
+    prevRef.current?.focus();
+  };
   const name = displayName(target, current);
   const handle = target.uniqueId || current?.uniqueId;
   const has = hasMemoContent(current);
@@ -95,6 +125,7 @@ export function MemoSheet({ target, current, showAvatars, onSave, onFavorite, on
             {note.length}/{MEMO_MAX_LEN}
           </span>
         </label>
+        <TemplateRow items={memoTemplates} onPick={pickNote} />
         <textarea
           ref={ref}
           rows={4}
@@ -107,7 +138,9 @@ export function MemoSheet({ target, current, showAvatars, onSave, onFavorite, on
           前回
           <span className="cnt">{previousNote.length}/{MEMO_MAX_LEN}</span>
         </label>
+        <TemplateRow items={previousTemplates} onPick={pickPrevious} />
         <textarea
+          ref={prevRef}
           aria-label="前回"
           rows={3}
           maxLength={MEMO_MAX_LEN}

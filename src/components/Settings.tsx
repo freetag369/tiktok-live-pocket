@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ARCHIVE_KEEP_MAX, ARCHIVE_KEEP_MIN, DEFAULT_WS_URL, type FontSize, type Settings } from '../lib/settings';
+import { ARCHIVE_KEEP_MAX, ARCHIVE_KEEP_MIN, DEFAULT_WS_URL, TEMPLATE_MAX_LEN, TEMPLATE_SLOTS, type FontSize, type Settings } from '../lib/settings';
 import { wakeLockSupported } from '../lib/wake-lock';
 import type { LiveSession } from '../lib/session';
 import { BackupSection } from './BackupSection';
@@ -25,6 +25,19 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
   const [confirmClearArchive, setConfirmClearArchive] = useState(false);
   const [archiveMsg, setArchiveMsg] = useState<string | null>(null);
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...value, [k]: v });
+  /** 定型文の枠 i だけを書き換える。枠数は TEMPLATE_SLOTS に揃える(古い保存データが短くても落ちない)。 */
+  const setTemplate = (k: 'memoTemplates' | 'previousTemplates', i: number, t: string) => {
+    const next = Array.from({ length: TEMPLATE_SLOTS }, (_, j) => value[k][j] ?? '');
+    next[i] = t;
+    set(k, next);
+  };
+  const templateInputs = (k: 'memoTemplates' | 'previousTemplates') => (
+    <div className="col">
+      {Array.from({ length: TEMPLATE_SLOTS }, (_, i) => (
+        <input key={i} type="text" maxLength={TEMPLATE_MAX_LEN} placeholder={`定型文 ${i + 1}`} value={value[k][i] ?? ''} onChange={(e) => setTemplate(k, i, e.target.value)} />
+      ))}
+    </div>
+  );
 
   return (
     <div className="sheet">
@@ -138,6 +151,20 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
               来店履歴をリセット
             </button>
           )}
+          <div className="field">
+            <label>
+              メモの定型文
+              <small>メモ欄の上に出るボタン。押すと文の一番最初に入ります。空にすると出ません(各 {TEMPLATE_MAX_LEN} 文字まで)</small>
+            </label>
+            {templateInputs('memoTemplates')}
+          </div>
+          <div className="field">
+            <label>
+              前回の定型文
+              <small>前回欄の上に出るボタン。同じく一番最初に入ります</small>
+            </label>
+            {templateInputs('previousTemplates')}
+          </div>
         </div>
 
         <div className="section">

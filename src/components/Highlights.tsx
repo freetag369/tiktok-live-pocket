@@ -32,6 +32,9 @@ interface Props {
   onPick: (day: string | null) => void;
   showAvatars: boolean;
   archiveEnabled: boolean;
+  /** メモ編集の定型文ボタン(設定)。MemoSheet にそのまま渡す。 */
+  memoTemplates?: string[];
+  previousTemplates?: string[];
 }
 
 /** 一度に出す人数・履歴の件数。 */
@@ -55,7 +58,7 @@ function useJapanToday(): string {
   return today;
 }
 
-export function Highlights({ session, generation, demo, memos, picked, onPick, showAvatars, archiveEnabled }: Props) {
+export function Highlights({ session, generation, demo, memos, picked, onPick, showAvatars, archiveEnabled, memoTemplates, previousTemplates }: Props) {
   const today = useJapanToday();
   const day = picked ?? today;
   const key = `${day}|${generation}|${demo ? 'demo' : 'live'}`;
@@ -174,6 +177,8 @@ export function Highlights({ session, generation, demo, memos, picked, onPick, s
           target={target}
           current={memos.get(target.userId)}
           showAvatars={showAvatars}
+          memoTemplates={memoTemplates}
+          previousTemplates={previousTemplates}
           autoFocus={false}
           showPreviousJoined
           previousJoinedMs={session.previousJoinedFor(target.userId)}
