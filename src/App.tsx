@@ -249,6 +249,8 @@ export function App() {
           onPick={setHighlightPick}
           showAvatars={settings.showAvatars}
           archiveEnabled={settings.archiveEnabled}
+          memoTemplates={settings.memoTemplates}
+          previousTemplates={settings.previousTemplates}
         />
       ) : (
         <div className={`feed-wrap${docked ? ' docked' : ''}`}>
@@ -302,6 +304,8 @@ export function App() {
           target={memoTarget}
           current={snap.memos.get(memoTarget.userId)}
           showAvatars={settings.showAvatars}
+          memoTemplates={settings.memoTemplates}
+          previousTemplates={settings.previousTemplates}
           showPreviousJoined
           previousJoinedMs={session.previousJoinedFor(memoTarget.userId)}
           onSave={(patch) => session.setMemo(memoTarget.userId, patch)}

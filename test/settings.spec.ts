@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeUniqueId, sanitize, DEFAULT_SETTINGS } from '../src/lib/settings';
+import { normalizeUniqueId, sanitize, DEFAULT_SETTINGS, TEMPLATE_SLOTS, TEMPLATE_MAX_LEN } from '../src/lib/settings';
 
 describe('normalizeUniqueId', () => {
   it('@ や URL を剥がす', () => {
@@ -35,5 +35,17 @@ describe('sanitize', () => {
     expect(DEFAULT_SETTINGS.likePopup).toBe(true);
     expect(sanitize({ ...DEFAULT_SETTINGS, likePopup: 'yes' as never }).likePopup).toBe(true);
     expect(sanitize({ ...DEFAULT_SETTINGS, likePopup: false }).likePopup).toBe(false);
+  });
+
+  it('定型文は 4 枠に揃え、trim と文字数制限、空の枠は保つ。配列でなければ既定', () => {
+    expect(DEFAULT_SETTINGS.memoTemplates).toHaveLength(TEMPLATE_SLOTS);
+    expect(DEFAULT_SETTINGS.previousTemplates).toHaveLength(TEMPLATE_SLOTS);
+    const long = 'あ'.repeat(TEMPLATE_MAX_LEN + 10);
+    const s = sanitize({ ...DEFAULT_SETTINGS, memoTemplates: [' 初見 ', '', long, 'x', '余り'], previousTemplates: undefined as never });
+    expect(s.memoTemplates).toEqual(['初見', '', 'あ'.repeat(TEMPLATE_MAX_LEN), 'x']);
+    expect(s.previousTemplates).toEqual(DEFAULT_SETTINGS.previousTemplates);
+    expect(sanitize({ ...DEFAULT_SETTINGS, memoTemplates: ['a'] }).memoTemplates).toEqual(['a', '', '', '']);
+    expect(sanitize({ ...DEFAULT_SETTINGS, memoTemplates: [1, null] as never }).memoTemplates).toEqual(['', '', '', '']);
+    expect(sanitize({ ...DEFAULT_SETTINGS, memoTemplates: 'x' as never }).memoTemplates).toEqual(DEFAULT_SETTINGS.memoTemplates);
   });
 });

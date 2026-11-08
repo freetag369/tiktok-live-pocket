@@ -41,6 +41,22 @@ export function hasMemoContent(m: MemoRecord | undefined): boolean {
 export const MEMO_MAX_LEN = 500;
 export const KANA_MAX_LEN = 50;
 
+/** 定型文と本文の境に区切りがあるとみなす文字(これがあれば「、」を足さない)。 */
+const SEPARATOR = /[、。,.，／/\s]/;
+
+/**
+ * 定型文ボタンを押したときの本文。定型文を本文の一番最初に入れる。
+ * 本文が空ならそのまま。あれば「、」で区切る(定型文の末尾か本文の先頭が区切り・空白なら足さない)。
+ * 結果は MEMO_MAX_LEN に切り詰める(textarea の maxLength と揃える)。
+ */
+export function prependTemplate(current: string, template: string): string {
+  const t = template.trim();
+  if (!t) return current;
+  if (!current) return t.slice(0, MEMO_MAX_LEN);
+  const sep = SEPARATOR.test(t.slice(-1)) || SEPARATOR.test(current.charAt(0)) ? '' : '、';
+  return (t + sep + current).slice(0, MEMO_MAX_LEN);
+}
+
 const EMPTY: ReadonlyMap<string, MemoRecord> = new Map();
 
 export class MemoBook {
