@@ -2,6 +2,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { RegularToast } from '../src/components/RegularToast';
+import { FeedList } from '../src/components/FeedList';
+import { dockJoins, JOIN_DOCK_KEEP, type FeedItem, type JoinRow } from '../src/lib/feed';
 import { isRegularJoin, makeRegularPop, nextRegular, pushRegular, REGULAR_POPUP_MS, REGULAR_QUEUE_MAX, REGULAR_VISITS } from '../src/lib/regular-popup';
 import type { MemoRecord } from '../src/lib/memos';
 import { LiveSession, type JoinNotice } from '../src/lib/session';
@@ -64,6 +66,20 @@ describe('常連さんの入室ポップアップ', () => {
       off();
       session.disconnect();
     }
+  });
+
+  it('ポップアップ ON なら常連さんの最初の入室は上にも枠にも出さず、それ以外の入室(メモのある人の再入室など)は枠に出す', () => {
+    const join = (id: string, userId: string, visits: number, nth: number): JoinRow => ({ k: 'join', id, tsMs: 0, viewer: { userId, nickname: `name-${id}` }, visits, firstEver: visits === 1, nth });
+    const rows: FeedItem[] = [join('reg', 'r', 8, 1), join('memo1', 'm', 2, 1), join('memo2', 'm', 2, 2), join('new', 'n', 1, 1)];
+    const memos = new Map<string, MemoRecord>([['m', memo({ userId: 'm', previousNote: 'お礼済み' })]]);
+    const popped = (r: JoinRow) => isRegularJoin(r, memos.get(r.viewer.userId));
+    expect(dockJoins(rows, 'all', JOIN_DOCK_KEEP, popped).map((r) => r.id)).toEqual(['memo2', 'new']);
+    const feed = renderToStaticMarkup(createElement(FeedList, { rows, tab: 'all', showAvatars: false, bigGiftDiamonds: 100, memos, empty: '', docked: true, popupRegulars: true }));
+    for (const id of ['reg', 'memo1', 'memo2', 'new']) expect(feed).not.toContain(`name-${id}`);
+    // OFF なら従来どおりメモのある人の入室は上に流す
+    const off = renderToStaticMarkup(createElement(FeedList, { rows, tab: 'all', showAvatars: false, bigGiftDiamonds: 100, memos, empty: '', docked: true }));
+    expect(off).toContain('name-memo1');
+    expect(off).not.toContain('name-reg');
   });
 
   it('設定は既定 ON、boolean 以外は ON に戻す', () => {

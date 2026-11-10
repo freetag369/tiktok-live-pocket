@@ -135,7 +135,16 @@ export function App() {
   // どれかを書いてある人の入室は上のフィードへ緑タグで(FeedList の keepJoin と同じ判定)。
   const dockTab = tab === 'all' || tab === 'comment' ? tab : null;
   const docked = dockTab !== null;
-  const memoJoin = useCallback((r: JoinRow) => featuredJoin(r.viewer, snap.memos.get(r.viewer.userId)), [snap.memos]);
+  // 常連さんの入室ポップアップが ON なら、常連さんの最初の入室はポップアップだけ(上にも枠にも出さない)、それ以外の入室は全部枠へ。
+  // OFF なら従来どおり、メモ・前回・よみがなのある人の入室は上のフィードに緑タグで流す。
+  const popupRegulars = settings.regularPopup;
+  const memoJoin = useCallback(
+    (r: JoinRow) => {
+      const m = snap.memos.get(r.viewer.userId);
+      return popupRegulars ? isRegularJoin(r, m) : featuredJoin(r.viewer, m);
+    },
+    [snap.memos, popupRegulars]
+  );
   const dockRows = useMemo(() => (dockTab ? dockJoins(f.rows, dockTab, JOIN_DOCK_KEEP, memoJoin) : []), [dockTab, f.rows, memoJoin]);
   // 枠の右の列(ギフト)。枠のあるタブではギフトは上のフィードに流さずここに出す。
   const dockGiftRows = useMemo(() => (dockTab ? dockGifts(f.rows, dockTab) : []), [dockTab, f.rows]);
@@ -293,6 +302,7 @@ export function App() {
             onTapRow={onTapRow}
             previousJoinedFor={session.previousJoinedFor}
             docked={docked}
+            popupRegulars={popupRegulars}
             empty={emptyText}
           />
           {settings.likePopup ? <LikeToasts likes={f.likes} likeCount={f.likeCount} showAvatars={settings.showAvatars} /> : null}
