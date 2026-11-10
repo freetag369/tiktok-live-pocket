@@ -79,6 +79,17 @@ export interface FollowNotice {
 }
 type FollowListener = (n: FollowNotice) => void;
 
+/** 入室が 1 件届いた(重複排除・鮮度チェック済み)。常連さんのポップアップ用。 */
+export interface JoinNotice {
+  viewer: Viewer;
+  visits: number;
+  firstEver: boolean;
+  /** その配信で何回目の入室か。 */
+  nth?: number;
+  tsMs: number;
+}
+type JoinListener = (n: JoinNotice) => void;
+
 /** これより古いフォローは通知しない(接続直後のバックログ再送対策)。 */
 export const FOLLOW_NOTICE_MAX_AGE_MS = 60_000;
 
@@ -154,6 +165,7 @@ export class LiveSession {
   private socket: EulerSocket | null = null;
   private listeners = new Set<Listener>();
   private followListeners = new Set<FollowListener>();
+  private joinListeners = new Set<JoinListener>();
   private scheduled = false;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private demoStop: (() => void) | null = null;
@@ -308,6 +320,14 @@ export class LiveSession {
     this.followListeners.add(fn);
     return () => {
       this.followListeners.delete(fn);
+    };
+  }
+
+  /** 入室の通知(常連さんのポップアップ用)。接続直後のバックログ再送(FOLLOW_NOTICE_MAX_AGE_MS より古い)は来ない。 */
+  onJoin(fn: JoinListener): () => void {
+    this.joinListeners.add(fn);
+    return () => {
+      this.joinListeners.delete(fn);
     };
   }
 
@@ -559,6 +579,10 @@ export class LiveSession {
       if (e.kind === 'social' && e.sub === 'follow' && (this.demoStop != null || now - e.tsMs <= FOLLOW_NOTICE_MAX_AGE_MS)) {
         const n: FollowNotice = { viewer: v, visits: meta.visits, firstEver: meta.firstEver, tsMs: e.tsMs };
         for (const l of this.followListeners) l(n);
+      }
+      if (e.kind === 'join' && touched?.k === 'join' && (this.demoStop != null || now - e.tsMs <= FOLLOW_NOTICE_MAX_AGE_MS)) {
+        const n: JoinNotice = { viewer: v, visits: meta.visits, firstEver: meta.firstEver, nth: touched.nth, tsMs: e.tsMs };
+        for (const l of this.joinListeners) l(n);
       }
     }
   }

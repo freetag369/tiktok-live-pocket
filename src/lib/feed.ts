@@ -381,6 +381,8 @@ export interface FilterOptions {
    * 固定枠から外れる分なので、タブの種類(コメントタブでも)に関わらず上に出す。
    */
   keepJoin?: (r: JoinRow) => boolean;
+  /** ギフトの行を外す(本画面用。下の固定枠の右側がギフトをまとめて出す)。 */
+  dropGifts?: boolean;
 }
 
 /**
@@ -399,7 +401,8 @@ export function filterRows<T extends FeedItem>(items: T[], tab: Tab, opts?: Filt
     }
     if (opts?.dropJoins && isJoinRow(i)) {
       if (!opts.keepJoin?.(i)) continue;
-    } else if (!inTab(i, tab)) continue;
+    } else if (opts?.dropGifts && i.k === 'gift') continue;
+    else if (!inTab(i, tab)) continue;
     out.push(i);
     rows++;
   }
@@ -425,6 +428,22 @@ export function dockJoins(items: FeedItem[], tab: Tab, limit = JOIN_DOCK_KEEP, e
   for (let i = items.length - 1; i >= 0 && out.length < limit; i--) {
     const it = items[i]!;
     if (isJoinRow(it) && !exclude?.(it)) out.push(it);
+  }
+  return out.reverse();
+}
+
+export type GiftRow = Extract<FeedRow, { k: 'gift' }>;
+
+/** 下の固定枠の右側(ギフト)に持つ行数(見た目は 3 件ぶん。それより前は枠の中を上へスクロールして見る)。 */
+export const GIFT_DOCK_KEEP = 50;
+
+/** 下の固定枠の右側に出すギフト: 末尾 limit 件(古い順)。枠を出さないタブでは空。連打は同じ行が伸びる。 */
+export function dockGifts(items: FeedItem[], tab: Tab, limit = GIFT_DOCK_KEEP): GiftRow[] {
+  if (!isDockTab(tab)) return [];
+  const out: GiftRow[] = [];
+  for (let i = items.length - 1; i >= 0 && out.length < limit; i--) {
+    const it = items[i]!;
+    if (it.k === 'gift') out.push(it);
   }
   return out.reverse();
 }
