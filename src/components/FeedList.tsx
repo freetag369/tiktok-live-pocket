@@ -23,7 +23,10 @@ interface Props {
   memos: ReadonlyMap<string, MemoRecord>;
   onTapRow?: (row: FeedRow) => void;
   previousJoinedFor?: (userId: string) => number | undefined;
-  /** 下の固定枠(JoinDock)が入室を出しているタブ。メモ・前回・よみがなの無い入室は上に流さず枠に出し、ある人の入室だけ上に流す。 */
+  /**
+   * 下の固定枠(JoinDock + GiftDock)を出しているタブ。メモ・前回・よみがなの無い入室は上に流さず枠に出し、ある人の入室だけ上に流す。
+   * ギフトは上に流さず枠の右の列に出す。
+   */
   docked?: boolean;
 }
 
@@ -95,7 +98,7 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
 
   // 枠のあるタブでは、メモ・前回・よみがなの無い入室は上に並べず下の固定枠(JoinDock)に出す。ある人の入室は上に緑タグで流す。
   const items = useMemo(
-    () => filterRows(rows, tab, docked ? { dropJoins: true, keepJoin: (r) => featuredJoin(r.viewer, memos.get(r.viewer.userId)) } : undefined),
+    () => filterRows(rows, tab, docked ? { dropJoins: true, keepJoin: (r) => featuredJoin(r.viewer, memos.get(r.viewer.userId)), dropGifts: true } : undefined),
     [rows, tab, docked, memos],
   );
   // 「前回」メモは、その配信でその人が最初に現れた行にだけ出す(毎行は出さない)。

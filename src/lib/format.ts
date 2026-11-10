@@ -20,6 +20,13 @@ export function lastJoined(ms?: number): string {
   return `${d.getMonth() + 1}月${d.getDate()}日${d.getHours()}時`;
 }
 
+/** 最終入室日(短い形。下の固定枠の狭い列用)。「11/4」、未記録なら「未記録」。 */
+export function lastJoinedShort(ms?: number): string {
+  if (ms == null || !Number.isFinite(ms) || ms <= 0) return '未記録';
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 export function hhmm(ms: number): string {
   const d = new Date(ms);
   const h = String(d.getHours()).padStart(2, '0');
