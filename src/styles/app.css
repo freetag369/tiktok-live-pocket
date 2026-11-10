@@ -254,26 +254,16 @@ img {
   bottom: 56px;
 }
 
-/* ── 下の固定枠: 左に入室・右にギフト(入室 5 行ぶんの高さ) ───── */
+/* ── 下の固定枠: 入室(入室 5 行ぶんの高さ) ───── */
 .dock {
   --dock-row: calc(var(--fs-sm) * 1.3 + 12px);
   --dock-rows: 5;
-  /* ギフトのカードは枠の高さに 3 件ぶん */
-  --dock-gifts: 3;
   flex: none;
-  display: grid;
-  grid-template-columns: minmax(0, 46fr) minmax(0, 54fr);
+  display: flex;
+  flex-direction: column;
   background: var(--bg-1);
   border-top: 1px solid var(--line);
   padding-bottom: var(--safe-bottom);
-}
-.dock-col {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.dock-gifts {
-  border-left: 1px solid var(--line);
 }
 .dock-title {
   flex: none;
@@ -307,11 +297,10 @@ img {
   color: var(--fg-faint);
   font-size: var(--fs-xs);
 }
-/* 枠の行は 1 行固定(名前 + 回数 + 前回入室日。メモは出さない。初見でも大きくしない) */
+/* 枠の行は 1 行固定(名前 + 回数 + 前回入室 + 時刻。メモは出さない。初見でも大きくしない) */
 .dock .row.join {
   height: var(--dock-row);
-  padding: 0 6px 0 8px;
-  gap: 6px;
+  padding: 0 12px;
   align-items: center;
   font-size: var(--fs-sm);
   overflow: hidden;
@@ -337,96 +326,10 @@ img {
 .dock .row.join .badge {
   flex: none;
 }
-.dock .row.join .head {
-  gap: 4px;
-}
 .dock .row.join .prev {
   flex: none;
   color: var(--fg-dim);
   font-size: var(--fs-xs);
-}
-
-/* 右の列: ギフトのカード(2 行。名前 + 時刻 / ギフト名 ×N 💎) */
-.dock-gift {
-  height: calc(var(--dock-row) * var(--dock-rows) / var(--dock-gifts));
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-  overflow: hidden;
-  background: rgba(255, 197, 66, 0.08);
-  border-left: 3px solid var(--gold);
-  border-bottom: 1px solid var(--line-soft);
-}
-.dock-gift.big {
-  background: linear-gradient(90deg, rgba(255, 197, 66, 0.3), rgba(255, 197, 66, 0.08));
-  animation: giftpop 0.5s ease-out;
-}
-.dock-gift.fav {
-  background: rgba(90, 169, 255, 0.16);
-}
-.dock-gift.tappable {
-  cursor: pointer;
-}
-.dock-gift .gift-icon {
-  width: calc(var(--dock-row) * var(--dock-rows) / var(--dock-gifts) - 12px);
-  height: calc(var(--dock-row) * var(--dock-rows) / var(--dock-gifts) - 12px);
-}
-.dock-gift .gift-icon.ph {
-  font-size: 20px;
-}
-.dock-gift .body {
-  flex: 1;
-  min-width: 0;
-  line-height: 1.3;
-}
-.dock-gift .head {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-}
-.dock-gift .who {
-  flex: 1;
-  min-width: 0;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dock-gift .kana {
-  flex: none;
-  color: var(--fg-dim);
-  font-size: var(--fs-xs);
-}
-.dock-gift .time {
-  flex: none;
-  color: var(--fg-faint);
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-}
-.dock-gift .gift-line {
-  margin-top: 1px;
-  gap: 6px;
-  white-space: nowrap;
-  font-size: var(--fs-sm);
-}
-.dock-gift .gift-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dock-gift .gift-cnt,
-.dock-gift .gift-dia {
-  flex: none;
-}
-.dock-gift .gift-dia {
-  font-size: var(--fs-xs);
-}
-.dock-gift.big .gift-dia {
-  color: var(--gold);
-  font-weight: 700;
 }
 .empty {
   margin: auto;
@@ -515,29 +418,6 @@ img {
 }
 .row .who {
   font-weight: 700;
-}
-/* コメントの行の頭(名前・呼び方・回数・時刻)は 1 行に収める。長い名前は後ろを「…」で切る。
-   呼び方は行の 4 割まで(超えたら切る)、回数・役割バッジ・時刻は切らない。 */
-.row.comment .head {
-  flex-wrap: nowrap;
-  white-space: nowrap;
-  min-width: 0;
-}
-.row.comment .head .who {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.row.comment .head .kana {
-  flex: none;
-  max-width: 40%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.row.comment .head .badge,
-.row.comment .head .time {
-  flex: none;
 }
 .row .time {
   margin-left: auto;
@@ -1200,128 +1080,13 @@ img {
   max-width: 100%;
   white-space: normal;
 }
-/* ── 画面上部のポップアップ置き場(常連さんの入室・フォロー通知を縦に積む) ───── */
-.top-pops {
-  position: fixed;
-  top: calc(var(--safe-top) + 6px);
-  left: calc(var(--safe-left) + 8px);
-  right: calc(var(--safe-right) + 8px);
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  pointer-events: none;
-}
-.top-pops > * {
-  pointer-events: auto;
-}
-
-/* ── 常連さんの入室(上からスライドイン。配信者名・タブの上に小さめに重ねる) ───── */
-.regular-toast {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 10px 7px;
-  background: var(--bg-2);
-  border: 1px solid var(--violet);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(169, 128, 255, 0.3);
-  overflow: hidden;
-  animation: toastin 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-  cursor: pointer;
-}
-.regular-toast.fav {
-  border-color: var(--blue);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(90, 169, 255, 0.35);
-}
-.regular-toast.leaving {
-  animation: toastout 0.22s ease-in forwards;
-}
-.regular-toast .avatar {
-  width: 30px;
-  height: 30px;
-  font-size: var(--fs-sm);
-}
-.regular-toast .body {
-  flex: 1;
-  min-width: 0;
-  line-height: 1.3;
-}
-.regular-toast .name {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  white-space: nowrap;
-  font-size: var(--fs);
-}
-.regular-toast .name .badge {
-  flex: none;
-}
-.regular-toast .who {
-  min-width: 0;
-  font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.regular-toast .kana {
-  flex: none;
-  color: var(--fg-dim);
-  font-size: var(--fs-sm);
-}
-.regular-toast .last-joined {
-  flex: none;
-  margin-left: auto;
-  color: var(--fg-faint);
-  font-size: var(--fs-xs);
-}
-.regular-toast .more {
-  flex: none;
-  color: var(--violet);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-}
-.regular-toast .memo {
-  margin-top: 1px;
-  font-size: var(--fs-sm);
-  color: var(--gold);
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-.regular-toast .memo.note {
-  -webkit-line-clamp: 1;
-  color: var(--fg-dim);
-  font-size: var(--fs-xs);
-}
-.regular-toast .timer {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 3px;
-  width: 100%;
-  background: var(--violet);
-  transform-origin: left;
-  animation-name: regulartimer;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
-}
-.regular-toast.fav .timer {
-  background: var(--blue);
-}
-@keyframes regulartimer {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
-  }
-}
-
 /* ── フォロー通知(上からスライドイン) ───────────────────── */
 .follow-toast {
+  position: fixed;
+  top: calc(var(--safe-top) + 8px);
+  left: calc(var(--safe-left) + 12px);
+  right: calc(var(--safe-right) + 12px);
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1349,12 +1114,10 @@ img {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .follow-toast,
-  .regular-toast {
+  .follow-toast {
     animation: none;
   }
-  .follow-toast.leaving,
-  .regular-toast.leaving {
+  .follow-toast.leaving {
     animation: none;
     opacity: 0;
   }

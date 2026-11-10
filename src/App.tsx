@@ -8,11 +8,8 @@ import { Highlights } from './components/Highlights';
 import { SettingsSheet } from './components/Settings';
 import { MemoSheet, type MemoTarget } from './components/MemoSheet';
 import { ViewersSheet } from './components/ViewersSheet';
-import { countDataRows, dockGifts, dockJoins, featuredJoin, JOIN_DOCK_KEEP, type FeedRow, type JoinRow } from './lib/feed';
+import { countDataRows, dockJoins, featuredJoin, JOIN_DOCK_KEEP, type FeedRow, type JoinRow } from './lib/feed';
 import { JoinDock } from './components/JoinDock';
-import { GiftDock } from './components/GiftDock';
-import { RegularToast } from './components/RegularToast';
-import { isRegularJoin, makeRegularPop, nextRegular, pushRegular, type RegularQueue } from './lib/regular-popup';
 import { FollowToast } from './components/FollowToast';
 import { followerName, pushFollow, type FollowToast as FollowToastState } from './lib/follow-toast';
 import { ArchiveSheet } from './components/Archive';
@@ -61,21 +58,6 @@ export function App() {
     [session]
   );
 
-  // 常連さんの入室ポップアップ(1 人ずつ。表示中に来た人は順番待ち)。
-  const [regulars, setRegulars] = useState<RegularQueue | null>(null);
-  const nextRegularPop = useCallback(() => setRegulars((q) => nextRegular(q, Date.now())), []);
-  useEffect(
-    () =>
-      session.onJoin((n) => {
-        if (!settingsRef.current.regularPopup) return;
-        const memo = session.getMemo(n.viewer.userId);
-        if (!isRegularJoin(n, memo)) return;
-        const pop = makeRegularPop(n.viewer, n.visits, memo, session.previousJoinedFor(n.viewer.userId));
-        setRegulars((q) => pushRegular(q, pop, Date.now()));
-      }),
-    [session]
-  );
-
   useEffect(() => {
     document.documentElement.dataset.fs = settings.fontSize;
   }, [settings.fontSize]);
@@ -97,10 +79,7 @@ export function App() {
     void setWakeLock(settings.wakeLock && running);
   }, [settings.wakeLock, running]);
   useEffect(() => {
-    if (!running) {
-      setToast(null);
-      setRegulars(null);
-    }
+    if (!running) setToast(null);
   }, [running]);
 
   const updateSettings = (next: Settings) => {
@@ -135,21 +114,9 @@ export function App() {
   // どれかを書いてある人の入室は上のフィードへ緑タグで(FeedList の keepJoin と同じ判定)。
   const dockTab = tab === 'all' || tab === 'comment' ? tab : null;
   const docked = dockTab !== null;
-  // 常連さんの入室ポップアップが ON なら、常連さんの最初の入室はポップアップだけ(上にも枠にも出さない)、それ以外の入室は全部枠へ。
-  // OFF なら従来どおり、メモ・前回・よみがなのある人の入室は上のフィードに緑タグで流す。
-  const popupRegulars = settings.regularPopup;
-  const memoJoin = useCallback(
-    (r: JoinRow) => {
-      const m = snap.memos.get(r.viewer.userId);
-      return popupRegulars ? isRegularJoin(r, m) : featuredJoin(r.viewer, m);
-    },
-    [snap.memos, popupRegulars]
-  );
+  const memoJoin = useCallback((r: JoinRow) => featuredJoin(r.viewer, snap.memos.get(r.viewer.userId)), [snap.memos]);
   const dockRows = useMemo(() => (dockTab ? dockJoins(f.rows, dockTab, JOIN_DOCK_KEEP, memoJoin) : []), [dockTab, f.rows, memoJoin]);
-  // 枠の右の列(ギフト)。枠のあるタブではギフトは上のフィードに流さずここに出す。
-  const dockGiftRows = useMemo(() => (dockTab ? dockGifts(f.rows, dockTab) : []), [dockTab, f.rows]);
   const isFavorite = useCallback((userId: string) => Boolean(snap.memos.get(userId)?.favorite), [snap.memos]);
-  const kanaFor = useCallback((userId: string) => snap.memos.get(userId)?.kana || undefined, [snap.memos]);
   const tabs: Array<[AppTab, string, number | null]> = [
     ['all', 'すべて', null],
     ['comment', 'コメント', f.commentCount],
@@ -191,12 +158,7 @@ export function App() {
         onSettings={() => setShowSettings(true)}
         onArchive={() => setShowArchive(true)}
       />
-      {(regulars && settings.regularPopup) || (toast && settings.followPopup) ? (
-        <div className="top-pops">
-          {regulars && settings.regularPopup ? <RegularToast queue={regulars} showAvatars={settings.showAvatars} onDone={nextRegularPop} /> : null}
-          {toast && settings.followPopup ? <FollowToast toast={toast} showAvatars={settings.showAvatars} onDone={dismissToast} /> : null}
-        </div>
-      ) : null}
+      {toast && settings.followPopup ? <FollowToast toast={toast} showAvatars={settings.showAvatars} onDone={dismissToast} /> : null}
       {snap.socket.s === 'error' ? (
         <div className="banner">
           <span>{snap.socket.message}</span>
@@ -302,18 +264,12 @@ export function App() {
             onTapRow={onTapRow}
             previousJoinedFor={session.previousJoinedFor}
             docked={docked}
-            popupRegulars={popupRegulars}
             empty={emptyText}
           />
           {settings.likePopup ? <LikeToasts likes={f.likes} likeCount={f.likeCount} showAvatars={settings.showAvatars} /> : null}
         </div>
       )}
-      {docked ? (
-        <div className="dock">
-          <JoinDock rows={dockRows} showAvatars={settings.showAvatars} previousJoinedFor={session.previousJoinedFor} isFavorite={isFavorite} onTapRow={onTapRow} />
-          <GiftDock rows={dockGiftRows} bigGiftDiamonds={settings.bigGiftDiamonds} isFavorite={isFavorite} kanaFor={kanaFor} onTapRow={onTapRow} />
-        </div>
-      ) : null}
+      {docked ? <JoinDock rows={dockRows} showAvatars={settings.showAvatars} previousJoinedFor={session.previousJoinedFor} isFavorite={isFavorite} onTapRow={onTapRow} /> : null}
       {showArchive ? <ArchiveSheet memos={snap.archiveMemos} session={session} settings={settings} currentRoomId={snap.demo ? '' : snap.room.roomId} onClose={() => setShowArchive(false)} /> : null}
       {showSettings ? (
         <SettingsSheet
