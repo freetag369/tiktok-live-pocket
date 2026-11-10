@@ -94,7 +94,7 @@ function parseArchive(raw: unknown): ArchiveBackup | null {
 export function applyBackupSettings(current: Settings, incoming: Partial<Settings> | null): Settings {
   if (!incoming) return current;
   const next: Record<string, unknown> = { ...current };
-  for (const k of ['hostUniqueId', 'eulerApiKey', 'showAvatars', 'fontSize', 'bigGiftDiamonds', 'wakeLock', 'followPopup', 'likePopup', 'regularPopup', 'wsUrl', 'archiveEnabled', 'archiveKeepStreams'] as const) {
+  for (const k of ['hostUniqueId', 'eulerApiKey', 'showAvatars', 'fontSize', 'bigGiftDiamonds', 'wakeLock', 'followPopup', 'likePopup', 'wsUrl', 'archiveEnabled', 'archiveKeepStreams'] as const) {
     const v = incoming[k];
     if (v === undefined || v === null) continue;
     next[k] = v;

@@ -23,16 +23,8 @@ interface Props {
   memos: ReadonlyMap<string, MemoRecord>;
   onTapRow?: (row: FeedRow) => void;
   previousJoinedFor?: (userId: string) => number | undefined;
-  /**
-   * 下の固定枠(JoinDock + GiftDock)を出しているタブ。メモ・前回・よみがなの無い入室は上に流さず枠に出し、ある人の入室だけ上に流す。
-   * ギフトは上に流さず枠の右の列に出す。
-   */
+  /** 下の固定枠(JoinDock)が入室を出しているタブ。メモ・前回・よみがなの無い入室は上に流さず枠に出し、ある人の入室だけ上に流す。 */
   docked?: boolean;
-  /**
-   * 常連さんの入室ポップアップが ON。枠のあるタブでは入室を上に一切流さない
-   * (常連さんの最初の入室はポップアップだけ、それ以外の入室は下の枠)。
-   */
-  popupRegulars?: boolean;
 }
 
 /** 追従を止めている間の窓。止めた時の行をそのまま保ち、新着は下に少しだけ足す。 */
@@ -91,7 +83,7 @@ function topRow(el: HTMLElement): { id: string; top: number } | null {
  * 「↓ 新着 N 件」で戻る(既存 PC アプリの見逃し防止と同じ思想)。
  * 追従を止めている間は表示中の行を動かさない(上限で落ちた入室も消さない)ので、画面が跳ねない。
  */
-export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos, onTapRow, previousJoinedFor, docked, popupRegulars }: Props) {
+export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos, onTapRow, previousJoinedFor, docked }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pinned, setPinned] = useState(true);
   const pinnedRef = useRef(true);
@@ -103,8 +95,8 @@ export function FeedList({ rows, tab, showAvatars, bigGiftDiamonds, empty, memos
 
   // 枠のあるタブでは、メモ・前回・よみがなの無い入室は上に並べず下の固定枠(JoinDock)に出す。ある人の入室は上に緑タグで流す。
   const items = useMemo(
-    () => filterRows(rows, tab, docked ? { dropJoins: true, keepJoin: popupRegulars ? undefined : (r) => featuredJoin(r.viewer, memos.get(r.viewer.userId)), dropGifts: true } : undefined),
-    [rows, tab, docked, memos, popupRegulars],
+    () => filterRows(rows, tab, docked ? { dropJoins: true, keepJoin: (r) => featuredJoin(r.viewer, memos.get(r.viewer.userId)) } : undefined),
+    [rows, tab, docked, memos],
   );
   // 「前回」メモは、その配信でその人が最初に現れた行にだけ出す(毎行は出さない)。
   // 「前回入室：」も入室の行と、その人の最初の行(入室が届かなかった人のコメント等)にだけ出す。

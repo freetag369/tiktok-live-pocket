@@ -38,9 +38,7 @@ describe('下の固定枠(入室)', () => {
         expect(dock).toContain('前回入室：9月28日19時');
         expect(dock).toContain('user31000000001');
         expect(dock).toContain('初見');
-        // 列が狭いので前回入室は日付だけ(何時かは title)。初見の人には出さない
-        expect(dock).toContain('前回 9/28');
-        expect(dock).not.toContain('未記録');
+        expect(dock).toContain('前回入室：未記録');
         expect(dock).not.toContain('が入室');
         expect(dock).not.toContain('badge join');
 

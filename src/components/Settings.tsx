@@ -114,13 +114,6 @@ export function SettingsSheet({ value, onChange, onClose, onDemo, onResetHistory
           </div>
           <div className="field">
             <label>
-              常連さんの入室通知
-              <small>来店 5 回以上・メモのある人が入室したら、前回のメモ付きで画面の上に長めに出します</small>
-            </label>
-            <input className="switch" type="checkbox" checked={value.regularPopup} onChange={(e) => set('regularPopup', e.target.checked)} />
-          </div>
-          <div className="field">
-            <label>
               画面を暗くしない
               <small>{wakeLockSupported() ? '受信中はスリープしません(iOS 16.4 以降)' : 'このブラウザでは使えません'}</small>
             </label>
