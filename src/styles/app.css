@@ -516,6 +516,29 @@ img {
 .row .who {
   font-weight: 700;
 }
+/* コメントの行の頭(名前・呼び方・回数・時刻)は 1 行に収める。長い名前は後ろを「…」で切る。
+   呼び方は行の 4 割まで(超えたら切る)、回数・役割バッジ・時刻は切らない。 */
+.row.comment .head {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  min-width: 0;
+}
+.row.comment .head .who {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row.comment .head .kana {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row.comment .head .badge,
+.row.comment .head .time {
+  flex: none;
+}
 .row .time {
   margin-left: auto;
   color: var(--fg-faint);
