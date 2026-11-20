@@ -1,45 +1,44 @@
-/** 表示用の日本語名。受信データは保持し、未登録の名前は原名を残す。 */
-const japaneseNames = new Map<string, string>([
-  ['rose', 'バラ'],
-  ['finger heart', '指ハート'],
-  ['swan', '白鳥'],
-  ['galaxy', '銀河'],
-  ['heart me', 'ハートミー'],
-  ['heart', 'ハート'],
-  ['tiktok', 'ティックトック'],
-  ['gg', 'グッドゲーム'],
-  ['ice cream cone', 'ソフトクリーム'],
+import official from './gift-names-ja.json';
+
+/**
+ * 表示用の日本語名。受信データ(英語名)は保持し、表示のときだけ直す。
+ * 公式の表は TikTok LIVE のギフト一覧(日本語)そのもので、`npm run gift-names` で作り直す。
+ */
+const norm = (name: string): string => name.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+
+const byId = new Map<string, string>();
+const byName = new Map<string, string>();
+for (const [id, en, ja] of official as [string, string, string][]) {
+  byId.set(id, ja);
+  // 同じ英語名で別のギフトがあるときは giftId の若い方(先に出たギフト)を名前引きに使う。
+  const key = norm(en);
+  if (key && !byName.has(key)) byName.set(key, ja);
+}
+
+/** 公式の一覧に無いギフト(終了したもの・地域限定など)のための手書きの訳。 */
+const fallbackNames = new Map<string, string>([
   ['ice cream', 'アイスクリーム'],
-  ['love you', '大好き'],
   ['music note', '音符'],
-  ['perfume', '香水'],
-  ['doughnut', 'ドーナツ'],
-  ['donut', 'ドーナツ'],
-  ['paper crane', '折り鶴'],
-  ['cap', 'キャップ'],
-  ['hat and mustache', '帽子とひげ'],
+  ['donut', 'ドーナッツ'],
   ['hand hearts', 'ハンドハート'],
-  ['confetti', '紙吹雪'],
-  ['love balloon', 'ハートの風船'],
   ['butterfly', '蝶'],
-  ['sunglasses', 'サングラス'],
-  ['corgi', 'コーギー'],
   ['dancing cactus', '踊るサボテン'],
-  ['money gun', 'マネーガン'],
-  ['fireworks', '花火'],
-  ['sports car', 'スポーツカー'],
-  ['motorcycle', 'オートバイ'],
-  ['private jet', 'プライベートジェット'],
   ['yacht', 'ヨット'],
-  ['lion', 'ライオン'],
-  ['tiktok universe', 'ティックトックユニバース'],
   ['universe', 'ユニバース'],
   ['trophy', 'トロフィー'],
   ['crown', '王冠'],
+  ['popular vote', '人気投票'],
+  ['nice to meet u', 'はじめまして'],
+  ['spidey pin', 'スパイディのピン'],
 ]);
 
 export function japaneseGiftName(name: string, giftId = ''): string {
   const trimmed = name.trim();
-  const key = trimmed.toLowerCase().replace(/[\s_-]+/g, ' ');
-  return japaneseNames.get(key) ?? (trimmed || (giftId ? `ギフト ${giftId}` : 'ギフト'));
+  const key = norm(trimmed);
+  return (
+    byId.get(giftId) ??
+    byName.get(key) ??
+    fallbackNames.get(key) ??
+    (trimmed || (giftId ? `ギフト ${giftId}` : 'ギフト'))
+  );
 }
